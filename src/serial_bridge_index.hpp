@@ -70,6 +70,7 @@ namespace serial_bridge
 	string decodeRct(const string &args_string);
 	string derivation_to_scalar(const string &args_string);
 	string decodeRctSimple(const string &args_string);
+	string encrypt_payment_id(const string &args_string);
 	//
 	// JSON values
 	network_type nettype_from_string(const string &nettype_string);
