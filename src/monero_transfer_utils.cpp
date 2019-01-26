@@ -287,15 +287,11 @@ void monero_transfer_utils::send_step1__prepare_params_for_get_decoys(
 			continue; // skip rct outputs if not creating rct tx
 		}
 		if (out.amount < monero_fork_rules::dust_threshold()) { // amount is dusty..
-			if (!is_sweeping) {
-//				cout << "Not sweeping, and found a dusty (though maybe mixable) output... skipping it!" << endl;
-				continue;
-			}
-			if (out.rct == none) { // Sweeping, and found a dusty but unmixable (non-rct) output... skipping it!
-//				cout << "Sweeping, and found a dusty but unmixable (non-rct) output... skipping it!" << endl;
+			if (out.rct == none) {
+//				cout << "Found a dusty but unmixable (non-rct) output... skipping it!" << endl;
 				continue;
 			} else {
-//				cout << "Sweeping and found a dusty but mixable (rct) amount... keeping it!" << endl;
+//				cout << "Found a dusty but mixable (rct) amount... keeping it!" << endl;
 			}
 		}
 		retVals.using_outs.push_back(out);
