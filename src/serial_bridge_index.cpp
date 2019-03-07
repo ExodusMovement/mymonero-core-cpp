@@ -601,6 +601,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		optl__passedIn_attemptAt_fee = stoull(*optl__passedIn_attemptAt_fee_string);
 	}
 	Send_Step2_RetVals retVals;
+	uint32_t hf_version = stoul(json_root.get<string>("hf_version"));
 	monero_transfer_utils::send_step2__try_create_transaction(
 		retVals,
 		//
@@ -616,9 +617,9 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		using_outs,
 		stoull(json_root.get<string>("fee_per_b")),
 		mix_outs,
-		[] (uint8_t version, int64_t early_blocks) -> bool
+		[hf_version] (uint8_t version, int64_t early_blocks) -> bool
 		{
-		   return lightwallet_hardcoded__use_fork_rules(version, early_blocks);
+			return hf_version >= version;
 		},
 		stoull(json_root.get<string>("unlock_time")),
 		nettype_from_string(json_root.get<string>("nettype_string"))

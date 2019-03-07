@@ -258,6 +258,7 @@ BOOST_AUTO_TEST_CASE(bridge__transfers__send__sweepDust)
 			root.put("unlock_time", "0");
 			root.put("priority", "1");
 			root.add_child("mix_outs", mix_outs);
+			root.put("hf_version", "8");
 			//
 			boost::property_tree::ptree ret_tree;
 			auto ret_string = serial_bridge::send_step2__try_create_transaction(args_string_from_root(root));
@@ -463,6 +464,7 @@ BOOST_AUTO_TEST_CASE(bridge__transfers__send__amount)
 			root.put("unlock_time", "0");
 			root.put("priority", "1");
 			root.add_child("mix_outs", mix_outs);
+			root.put("hf_version", "8");
 			//
 			boost::property_tree::ptree ret_tree;
 			auto ret_string = serial_bridge::send_step2__try_create_transaction(args_string_from_root(root));
@@ -1437,6 +1439,7 @@ BOOST_AUTO_TEST_CASE(bridge__transfers__send_stagenet_coinbase)
 			root.put("unlock_time", "0");
 			root.put("priority", "1");
 			root.add_child("mix_outs", mix_outs);
+			root.put("hf_version", "8");
 			//
 			boost::property_tree::ptree ret_tree;
 			auto ret_string = serial_bridge::send_step2__try_create_transaction(args_string_from_root(root));
