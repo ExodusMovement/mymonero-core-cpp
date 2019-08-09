@@ -50,49 +50,6 @@ using namespace monero_fee_utils;
 using namespace monero_key_image_utils; // for API response parsing
 //
 // Transfer parsing/derived properties
-bool monero_transfer_utils::is_transfer_unlocked(
-	uint64_t unlock_time,
-	uint64_t block_height,
-	uint64_t blockchain_size, /* extracting wallet2->m_blockchain.size() / m_local_bc_height */
-	network_type nettype
-) {
-	if(!is_tx_spendtime_unlocked(unlock_time, block_height, blockchain_size, nettype))
-		return false;
-
-	if(block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE > blockchain_size)
-		return false;
-
-	return true;
-}
-bool monero_transfer_utils::is_tx_spendtime_unlocked(
-	uint64_t unlock_time,
-	uint64_t block_height,
-	uint64_t blockchain_size,
-	network_type nettype
-) {
-	if(unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER)
-	{
-		//interpret as block index
-		if(blockchain_size-1 + CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_BLOCKS >= unlock_time)
-			return true;
-		else
-			return false;
-	}else
-	{
-		//interpret as time
-		uint64_t current_time = static_cast<uint64_t>(time(NULL));
-		// XXX: this needs to be fast, so we'd need to get the starting heights
-		// from the daemon to be correct once voting kicks in
-		uint64_t v2height = nettype == TESTNET ? 624634 : nettype == STAGENET ? (uint64_t)-1/*TODO*/ : 1009827;
-		uint64_t leeway = block_height < v2height ? CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1 : CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2;
-		if(current_time + leeway >= unlock_time)
-			return true;
-		else
-			return false;
-	}
-	return false;
-}
-//
 namespace {
 CreateTransactionErrorCode _add_pid_to_tx_extra(
 	const optional<string>& payment_id_string,
@@ -184,7 +141,7 @@ bool _rct_hex_to_decrypted_mask(
 	sc_sub(decrypted_mask.bytes,
 		encrypted_mask.bytes,
 		rct::hash_to_scalar(make_key_derivation()).bytes);
-	
+
 	return true;
 }
 bool _verify_sec_key(const crypto::secret_key &secret_key, const crypto::public_key &public_key)
@@ -208,7 +165,7 @@ namespace
 			vec[idx] = std::move(vec.back());
 		}
 		vec.resize(vec.size() - 1);
-		
+
 		return res;
 	}
 	//
@@ -216,7 +173,7 @@ namespace
 	T pop_random_value(std::vector<T>& vec)
 	{
 		CHECK_AND_ASSERT_MES(!vec.empty(), T(), "Vector must be non-empty");
-		
+
 		size_t idx = crypto::rand<size_t>() % vec.size();
 		return pop_index (vec, idx);
 	}
@@ -459,12 +416,12 @@ void monero_transfer_utils::create_transaction(
 	const account_keys& sender_account_keys, // this will reference a particular hw::device
 	const uint32_t subaddr_account_idx,
 	const std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses,
-	const address_parse_info &to_addr, 
+	const address_parse_info &to_addr,
 	uint64_t sending_amount,
 	uint64_t change_amount,
 	uint64_t fee_amount,
 	const vector<SpendableOutput> &outputs,
-	vector<RandomAmountOutputs> &mix_outs, 
+	vector<RandomAmountOutputs> &mix_outs,
 	const std::vector<uint8_t> &extra,
 	use_fork_rules_fn_type use_fork_rules_fn,
 	uint64_t unlock_time, // or 0
@@ -828,6 +785,6 @@ void monero_transfer_utils::convenience__create_transaction(
 	//
 //	cout << "out 0: " << string_tools::pod_to_hex(boost::get<txout_to_key>((*(actualCall_retVals.tx)).vout[0].target).key) << endl;
 //	cout << "out 1: " << string_tools::pod_to_hex(boost::get<txout_to_key>((*(actualCall_retVals.tx)).vout[1].target).key) << endl;
-	//	
+	//
 	retVals.txBlob_byteLength = txBlob_byteLength;
 }
