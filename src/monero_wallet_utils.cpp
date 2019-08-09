@@ -33,7 +33,6 @@
 #include "monero_wallet_utils.hpp"
 #include <boost/algorithm/string.hpp>
 #include "cryptonote_basic.h"
-#include "device/device.hpp"
 #include "cryptonote_basic/account.h"
 #include "wallet_errors.h" // not crazy about including this but it's not that bad
 #include "keccak.h"
@@ -232,7 +231,7 @@ bool monero_wallet_utils::decoded_seed(
 	retVals.mnemonic_language = mnemonic_language;
 	retVals.optl__sec_seed = sec_seed;
 	retVals.optl__sec_seed_string = sec_seed_string;
-	retVals.optl__mnemonic_string = mnemonic_string; 
+	retVals.optl__mnemonic_string = mnemonic_string;
 	retVals.from_legacy16B_lw_seed = from_legacy16B_lw_seed;
 	//
 	return true;
