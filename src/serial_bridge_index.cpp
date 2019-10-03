@@ -882,3 +882,166 @@ string serial_bridge::encrypt_payment_id(const string &args_string)
 	root.put(ret_json_key__generic_retVal(), epee::string_tools::pod_to_hex(payment_id));
 	return ret_json_from_root(root);
 }
+
+bool keys_equal(crypto::public_key a, crypto::public_key b)
+{
+	return equal(a.data, a.data + 32, b.data);
+}
+
+string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index)
+{
+	if (version == 1) {
+		return amount;
+	} else if (version == 2) {
+		rct::key sk;
+		crypto::ec_scalar scalar = AUTO_VAL_INIT(scalar);
+		crypto::derivation_to_scalar(derivation, index, scalar);
+
+		string sk_str = epee::string_tools::pod_to_hex(scalar);
+		epee::string_tools::hex_to_pod(sk_str, sk);
+
+		rct::key mask;
+		rct::xmr_amount decoded_amount;
+
+		if (rv.type == rct::RCTTypeNull) {
+			decoded_amount = rct::decodeRct(rv, sk, index, mask, hw::get_device("default"));
+		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeFull || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2) {
+			decoded_amount = rct::decodeRctSimple(rv, sk, index, mask, hw::get_device("default"));
+		}
+
+		ostringstream decoded_amount_ss;
+		decoded_amount_ss << decoded_amount;
+
+		return decoded_amount_ss.str();
+	} else {}
+
+	return "";
+}
+
+string serial_bridge::decode_tx(const string &args_string)
+{
+	boost::property_tree::ptree json_root;
+	if (!parsed_json_root(args_string, json_root)) {
+		// it will already have thrown an exception
+		return error_ret_json_from_message("Invalid JSON");
+	}
+
+	crypto::secret_key sec_view_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), sec_view_key)) {
+		return error_ret_json_from_message("Invalid 'sec_viewKey_string'");
+	}
+
+	crypto::public_key pub_spend_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
+		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
+	}
+
+	auto tx_desc = json_root.get_child("tx");
+
+	string tx_id = tx_desc.get<string>("id");
+
+	crypto::public_key tx_pub_key;
+	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx_pub_key)) {
+		return error_ret_json_from_message("Invalid 'tx.pub'");
+	}
+
+	int version = stoul(tx_desc.get<string>("version"));
+
+	auto rv_desc = tx_desc.get_child("rv");
+	rct::rctSig rv = AUTO_VAL_INIT(rv);
+	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
+
+	if (rv_type_int == rct::RCTTypeNull) {
+		rv.type = rct::RCTTypeNull;
+	} else if (rv_type_int == rct::RCTTypeSimple) {
+		rv.type = rct::RCTTypeSimple;
+	} else if (rv_type_int == rct::RCTTypeFull) {
+		rv.type = rct::RCTTypeFull;
+	} else if (rv_type_int == rct::RCTTypeBulletproof) {
+		rv.type = rct::RCTTypeBulletproof;
+	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
+		rv.type = rct::RCTTypeBulletproof2;
+	} else {
+		return error_ret_json_from_message("Invalid 'rv.type'");
+	}
+
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
+	{
+		assert(ecdh_info_desc.first.empty()); // array elements have no names
+		auto ecdh_info = rct::ecdhTuple{};
+		if (rv.type == rct::RCTTypeBulletproof2) {
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8&)ecdh_info.amount)) {
+				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
+			}
+		} else {
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask)) {
+				return error_ret_json_from_message("Invalid rv.ecdhInfo[].mask");
+			}
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), ecdh_info.amount)) {
+				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
+			}
+		}
+		rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
+	}
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
+	{
+		assert(outPk_desc.first.empty()); // array elements have no names
+		auto outPk = rct::ctkey{};
+		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask)) {
+			return error_ret_json_from_message("Invalid rv.outPk[].mask");
+		}
+		rv.outPk.push_back(outPk); // rct keys aren't movable
+	}
+
+	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+	if (!crypto::generate_key_derivation(tx_pub_key, sec_view_key, derivation)) {
+		return error_ret_json_from_message("Unable to generate key derivation");
+	}
+
+	vector<Utxo> utxos;
+	int curr = 0;
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
+	{
+		int output_index = curr++;
+		assert(output_desc.first.empty()); // array elements have no names
+
+		crypto::public_key output_pub_key;
+		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output_pub_key)) {
+			return error_ret_json_from_message("Invalid 'tx.outputs.pub'");
+		}
+
+		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
+		if (!crypto::derive_public_key(derivation, output_index, pub_spend_key, derived_key)) {
+			return error_ret_json_from_message("Unable to derive public key");
+		}
+
+		if (!keys_equal(output_pub_key, derived_key)) continue;
+
+		string raw_amount = output_desc.second.get<string>("amount");
+
+		Utxo utxo;
+		utxo.tx_id = tx_id;
+		utxo.vout = output_index;
+		utxo.amount = decode_amount(version, derivation, rv, raw_amount, output_index);
+
+		utxos.push_back(utxo);
+	}
+
+	boost::property_tree::ptree root;
+	boost::property_tree::ptree utxos_ptree;
+
+	BOOST_FOREACH(Utxo &utxo, utxos)
+	{
+		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
+		auto& out_ptree = out_ptree_pair.second;
+
+		out_ptree.put("tx_id", utxo.tx_id);
+		out_ptree.put("vout", utxo.vout);
+		out_ptree.put("amount", utxo.amount);
+		utxos_ptree.push_back(out_ptree_pair);
+	}
+
+	root.add_child("outputs", utxos_ptree);
+
+	return ret_json_from_root(root);
+}

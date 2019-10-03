@@ -42,6 +42,13 @@ namespace serial_bridge
 {
 	using namespace std;
 	using namespace cryptonote;
+
+	struct Utxo {
+		string tx_id;
+		uint8_t vout;
+		string amount;
+	};
+
 	//
 	// Bridging Functions - these take and return JSON strings
 	string send_step1__prepare_params_for_get_decoys(const string &args_string);
@@ -75,6 +82,8 @@ namespace serial_bridge
 	string decodeRct(const string &args_string);
 	string decodeRctSimple(const string &args_string);
 	string encrypt_payment_id(const string &args_string);
+
+	string decode_tx(const string &args_string);
 }
 
 #endif /* serial_bridge_index_hpp */
