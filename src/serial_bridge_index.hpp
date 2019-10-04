@@ -35,6 +35,8 @@
 //
 #include <string>
 #include "cryptonote_config.h"
+#include "crypto/crypto.h"
+#include "ringct/rctTypes.h"
 //
 // See serial_bridge_utils.hpp
 //
@@ -42,6 +44,20 @@ namespace serial_bridge
 {
 	using namespace std;
 	using namespace cryptonote;
+
+	struct Output {
+		uint8_t index;
+		crypto::public_key pub;
+		string amount;
+	};
+
+	struct Transaction {
+		string id;
+		crypto::public_key pub;
+		uint8_t version;
+		rct::rctSig rv;
+		vector<Output> outputs;
+	};
 
 	struct Utxo {
 		string tx_id;
@@ -84,6 +100,7 @@ namespace serial_bridge
 	string decodeRctSimple(const string &args_string);
 	string encrypt_payment_id(const string &args_string);
 
+	vector<Utxo> _decode_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
 	string decode_tx(const string &args_string);
 }
 

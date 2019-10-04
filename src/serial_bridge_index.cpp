@@ -913,13 +913,47 @@ string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig
 		decoded_amount_ss << decoded_amount;
 
 		return decoded_amount_ss.str();
-	} else {}
+	}
 
 	return "";
 }
 
+vector<Utxo> serial_bridge::_decode_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key) {
+	vector<Utxo> utxos;
+
+	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+	if (!crypto::generate_key_derivation(tx.pub, sec_view_key, derivation)) {
+		return utxos;
+	}
+
+	BOOST_FOREACH(Output &output, tx.outputs)
+	{
+		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
+		if (!crypto::derive_public_key(derivation, output.index, pub_spend_key, derived_key)) {
+			continue;
+		}
+
+		if (!keys_equal(output.pub, derived_key)) continue;
+
+		Utxo utxo;
+		utxo.tx_id = tx.id;
+		utxo.vout = output.index;
+		utxo.amount = decode_amount(tx.version, derivation, tx.rv, output.amount, output.index);
+
+		monero_key_image_utils::KeyImageRetVals retVals;
+		monero_key_image_utils::new__key_image(pub_spend_key, sec_spend_key, sec_view_key, tx.pub, output.index, retVals);
+		utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
+
+		utxos.push_back(utxo);
+	}
+
+	return utxos;
+}
+
 string serial_bridge::decode_tx(const string &args_string)
 {
+	Transaction tx;
+
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
@@ -943,29 +977,28 @@ string serial_bridge::decode_tx(const string &args_string)
 
 	auto tx_desc = json_root.get_child("tx");
 
-	string tx_id = tx_desc.get<string>("id");
+	tx.id = tx_desc.get<string>("id");
 
-	crypto::public_key tx_pub_key;
-	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx_pub_key)) {
+	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub)) {
 		return error_ret_json_from_message("Invalid 'tx.pub'");
 	}
 
-	int version = stoul(tx_desc.get<string>("version"));
+	tx.version = stoul(tx_desc.get<string>("version"));
 
 	auto rv_desc = tx_desc.get_child("rv");
-	rct::rctSig rv = AUTO_VAL_INIT(rv);
 	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
 
+	tx.rv = AUTO_VAL_INIT(tx.rv);
 	if (rv_type_int == rct::RCTTypeNull) {
-		rv.type = rct::RCTTypeNull;
+		tx.rv.type = rct::RCTTypeNull;
 	} else if (rv_type_int == rct::RCTTypeSimple) {
-		rv.type = rct::RCTTypeSimple;
+		tx.rv.type = rct::RCTTypeSimple;
 	} else if (rv_type_int == rct::RCTTypeFull) {
-		rv.type = rct::RCTTypeFull;
+		tx.rv.type = rct::RCTTypeFull;
 	} else if (rv_type_int == rct::RCTTypeBulletproof) {
-		rv.type = rct::RCTTypeBulletproof;
+		tx.rv.type = rct::RCTTypeBulletproof;
 	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
-		rv.type = rct::RCTTypeBulletproof2;
+		tx.rv.type = rct::RCTTypeBulletproof2;
 	} else {
 		return error_ret_json_from_message("Invalid 'rv.type'");
 	}
@@ -974,7 +1007,7 @@ string serial_bridge::decode_tx(const string &args_string)
 	{
 		assert(ecdh_info_desc.first.empty()); // array elements have no names
 		auto ecdh_info = rct::ecdhTuple{};
-		if (rv.type == rct::RCTTypeBulletproof2) {
+		if (tx.rv.type == rct::RCTTypeBulletproof2) {
 			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8&)ecdh_info.amount)) {
 				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
 			}
@@ -986,7 +1019,7 @@ string serial_bridge::decode_tx(const string &args_string)
 				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
 			}
 		}
-		rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
+		tx.rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
 	}
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
 	{
@@ -995,50 +1028,29 @@ string serial_bridge::decode_tx(const string &args_string)
 		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask)) {
 			return error_ret_json_from_message("Invalid rv.outPk[].mask");
 		}
-		rv.outPk.push_back(outPk); // rct keys aren't movable
+		tx.rv.outPk.push_back(outPk); // rct keys aren't movable
 	}
 
-	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-	if (!crypto::generate_key_derivation(tx_pub_key, sec_view_key, derivation)) {
-		return error_ret_json_from_message("Unable to generate key derivation");
-	}
-
-	vector<Utxo> utxos;
-	int curr = 0;
+	uint8_t curr = 0;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
 	{
-		int output_index = curr++;
 		assert(output_desc.first.empty()); // array elements have no names
+		Output output;
+		output.index = curr++;
 
-		crypto::public_key output_pub_key;
-		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output_pub_key)) {
+		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
 			return error_ret_json_from_message("Invalid 'tx.outputs.pub'");
 		}
 
-		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
-		if (!crypto::derive_public_key(derivation, output_index, pub_spend_key, derived_key)) {
-			return error_ret_json_from_message("Unable to derive public key");
-		}
+		output.amount = output_desc.second.get<string>("amount");
 
-		if (!keys_equal(output_pub_key, derived_key)) continue;
-
-		string raw_amount = output_desc.second.get<string>("amount");
-
-		Utxo utxo;
-		utxo.tx_id = tx_id;
-		utxo.vout = output_index;
-		utxo.amount = decode_amount(version, derivation, rv, raw_amount, output_index);
-
-		monero_key_image_utils::KeyImageRetVals retVals;
-		monero_key_image_utils::new__key_image(pub_spend_key, sec_spend_key, sec_view_key, tx_pub_key, output_index, retVals);
-		utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
-
-		utxos.push_back(utxo);
+		tx.outputs.push_back(output);
 	}
+
+	vector<Utxo> utxos = serial_bridge::_decode_tx(tx, sec_view_key, sec_spend_key, pub_spend_key);
 
 	boost::property_tree::ptree root;
 	boost::property_tree::ptree utxos_ptree;
-
 	BOOST_FOREACH(Utxo &utxo, utxos)
 	{
 		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
