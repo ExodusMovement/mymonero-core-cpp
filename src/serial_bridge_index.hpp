@@ -47,6 +47,7 @@ namespace serial_bridge
 		string tx_id;
 		uint8_t vout;
 		string amount;
+		string key_image;
 	};
 
 	//

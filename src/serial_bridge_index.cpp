@@ -931,6 +931,11 @@ string serial_bridge::decode_tx(const string &args_string)
 		return error_ret_json_from_message("Invalid 'sec_viewKey_string'");
 	}
 
+	crypto::secret_key sec_spend_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key)) {
+		return error_ret_json_from_message("Invalid 'sec_spendKey_string'");
+	}
+
 	crypto::public_key pub_spend_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
 		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
@@ -1024,6 +1029,10 @@ string serial_bridge::decode_tx(const string &args_string)
 		utxo.vout = output_index;
 		utxo.amount = decode_amount(version, derivation, rv, raw_amount, output_index);
 
+		monero_key_image_utils::KeyImageRetVals retVals;
+		monero_key_image_utils::new__key_image(pub_spend_key, sec_spend_key, sec_view_key, tx_pub_key, output_index, retVals);
+		utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
+
 		utxos.push_back(utxo);
 	}
 
@@ -1038,6 +1047,7 @@ string serial_bridge::decode_tx(const string &args_string)
 		out_ptree.put("tx_id", utxo.tx_id);
 		out_ptree.put("vout", utxo.vout);
 		out_ptree.put("amount", utxo.amount);
+		out_ptree.put("key_image", utxo.key_image);
 		utxos_ptree.push_back(out_ptree_pair);
 	}
 
