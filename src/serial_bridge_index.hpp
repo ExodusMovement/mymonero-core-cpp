@@ -34,6 +34,7 @@
 #define serial_bridge_index_hpp
 //
 #include <string>
+#include <boost/property_tree/ptree.hpp>
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
@@ -100,8 +101,12 @@ namespace serial_bridge
 	string decodeRctSimple(const string &args_string);
 	string encrypt_payment_id(const string &args_string);
 
+	Transaction json_to_tx(boost::property_tree::ptree tree);
+	string utxos_to_json(vector<Utxo> utxos);
+
 	vector<Utxo> _decode_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
 	string decode_tx(const string &args_string);
+	string decode_txs(const string &args_string);
 }
 
 #endif /* serial_bridge_index_hpp */

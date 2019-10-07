@@ -918,6 +918,102 @@ string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig
 	return "";
 }
 
+Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc) {
+	Transaction tx;
+
+	tx.id = tx_desc.get<string>("id");
+
+	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub)) {
+		throw std::invalid_argument("Invalid 'tx_desc.pub'");
+	}
+
+	tx.version = stoul(tx_desc.get<string>("version"));
+
+	auto rv_desc = tx_desc.get_child("rv");
+	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
+
+	tx.rv = AUTO_VAL_INIT(tx.rv);
+	if (rv_type_int == rct::RCTTypeNull) {
+		tx.rv.type = rct::RCTTypeNull;
+	} else if (rv_type_int == rct::RCTTypeSimple) {
+		tx.rv.type = rct::RCTTypeSimple;
+	} else if (rv_type_int == rct::RCTTypeFull) {
+		tx.rv.type = rct::RCTTypeFull;
+	} else if (rv_type_int == rct::RCTTypeBulletproof) {
+		tx.rv.type = rct::RCTTypeBulletproof;
+	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
+		tx.rv.type = rct::RCTTypeBulletproof2;
+	} else {
+		throw std::invalid_argument("Invalid 'tx_desc.rv.type'");
+	}
+
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
+	{
+		assert(ecdh_info_desc.first.empty()); // array elements have no names
+		auto ecdh_info = rct::ecdhTuple{};
+		if (tx.rv.type == rct::RCTTypeBulletproof2) {
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8&)ecdh_info.amount)) {
+				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].amount'");
+			}
+		} else {
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask)) {
+				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].mask'");
+			}
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), ecdh_info.amount)) {
+				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].amount'");
+			}
+		}
+		tx.rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
+	}
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
+	{
+		assert(outPk_desc.first.empty()); // array elements have no names
+		auto outPk = rct::ctkey{};
+		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask)) {
+			throw std::invalid_argument("Invalid 'tx_desc.rv.outPk[].mask'");
+		}
+		tx.rv.outPk.push_back(outPk); // rct keys aren't movable
+	}
+
+	uint8_t curr = 0;
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
+	{
+		assert(output_desc.first.empty()); // array elements have no names
+		Output output;
+		output.index = curr++;
+
+		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
+			throw std::invalid_argument("Invalid 'tx_desc.outputs.pub'");
+		}
+
+		output.amount = output_desc.second.get<string>("amount");
+
+		tx.outputs.push_back(output);
+	}
+
+	return tx;
+}
+
+string serial_bridge::utxos_to_json(vector<Utxo> utxos) {
+	boost::property_tree::ptree root;
+	boost::property_tree::ptree utxos_ptree;
+	BOOST_FOREACH(Utxo &utxo, utxos)
+	{
+		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
+		auto& out_ptree = out_ptree_pair.second;
+
+		out_ptree.put("tx_id", utxo.tx_id);
+		out_ptree.put("vout", utxo.vout);
+		out_ptree.put("amount", utxo.amount);
+		out_ptree.put("key_image", utxo.key_image);
+		utxos_ptree.push_back(out_ptree_pair);
+	}
+
+	root.add_child("outputs", utxos_ptree);
+
+	return ret_json_from_root(root);
+}
+
 vector<Utxo> serial_bridge::_decode_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key) {
 	vector<Utxo> utxos;
 
@@ -952,8 +1048,6 @@ vector<Utxo> serial_bridge::_decode_tx(Transaction tx, crypto::secret_key sec_vi
 
 string serial_bridge::decode_tx(const string &args_string)
 {
-	Transaction tx;
-
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
@@ -976,94 +1070,50 @@ string serial_bridge::decode_tx(const string &args_string)
 	}
 
 	auto tx_desc = json_root.get_child("tx");
+	try {
+		auto tx = serial_bridge::json_to_tx(tx_desc);
+		auto utxos = serial_bridge::_decode_tx(tx, sec_view_key, sec_spend_key, pub_spend_key);
+		return serial_bridge::utxos_to_json(utxos);
+	} catch(std::invalid_argument err) {
+		return error_ret_json_from_message(err.what());
+	}
+}
 
-	tx.id = tx_desc.get<string>("id");
-
-	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub)) {
-		return error_ret_json_from_message("Invalid 'tx.pub'");
+string serial_bridge::decode_txs(const string &args_string) {
+	boost::property_tree::ptree json_root;
+	if (!parsed_json_root(args_string, json_root)) {
+		// it will already have thrown an exception
+		return error_ret_json_from_message("Invalid JSON");
 	}
 
-	tx.version = stoul(tx_desc.get<string>("version"));
-
-	auto rv_desc = tx_desc.get_child("rv");
-	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
-
-	tx.rv = AUTO_VAL_INIT(tx.rv);
-	if (rv_type_int == rct::RCTTypeNull) {
-		tx.rv.type = rct::RCTTypeNull;
-	} else if (rv_type_int == rct::RCTTypeSimple) {
-		tx.rv.type = rct::RCTTypeSimple;
-	} else if (rv_type_int == rct::RCTTypeFull) {
-		tx.rv.type = rct::RCTTypeFull;
-	} else if (rv_type_int == rct::RCTTypeBulletproof) {
-		tx.rv.type = rct::RCTTypeBulletproof;
-	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
-		tx.rv.type = rct::RCTTypeBulletproof2;
-	} else {
-		return error_ret_json_from_message("Invalid 'rv.type'");
+	crypto::secret_key sec_view_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), sec_view_key)) {
+		return error_ret_json_from_message("Invalid 'sec_viewKey_string'");
 	}
 
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
+	crypto::secret_key sec_spend_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key)) {
+		return error_ret_json_from_message("Invalid 'sec_spendKey_string'");
+	}
+
+	crypto::public_key pub_spend_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
+		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
+	}
+	vector<Utxo> utxos;
+
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
 	{
-		assert(ecdh_info_desc.first.empty()); // array elements have no names
-		auto ecdh_info = rct::ecdhTuple{};
-		if (tx.rv.type == rct::RCTTypeBulletproof2) {
-			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8&)ecdh_info.amount)) {
-				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
-			}
-		} else {
-			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask)) {
-				return error_ret_json_from_message("Invalid rv.ecdhInfo[].mask");
-			}
-			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), ecdh_info.amount)) {
-				return error_ret_json_from_message("Invalid rv.ecdhInfo[].amount");
-			}
+		assert(tx_desc.first.empty());
+
+		try {
+			auto tx = serial_bridge::json_to_tx(tx_desc.second);
+			auto tx_utxos = serial_bridge::_decode_tx(tx, sec_view_key, sec_spend_key, pub_spend_key);
+			utxos.insert(std::end(utxos), std::begin(tx_utxos), std::end(tx_utxos));
+		} catch(std::invalid_argument err) {
+			return error_ret_json_from_message(err.what());
 		}
-		tx.rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
-	}
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
-	{
-		assert(outPk_desc.first.empty()); // array elements have no names
-		auto outPk = rct::ctkey{};
-		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask)) {
-			return error_ret_json_from_message("Invalid rv.outPk[].mask");
-		}
-		tx.rv.outPk.push_back(outPk); // rct keys aren't movable
 	}
 
-	uint8_t curr = 0;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
-	{
-		assert(output_desc.first.empty()); // array elements have no names
-		Output output;
-		output.index = curr++;
-
-		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
-			return error_ret_json_from_message("Invalid 'tx.outputs.pub'");
-		}
-
-		output.amount = output_desc.second.get<string>("amount");
-
-		tx.outputs.push_back(output);
-	}
-
-	vector<Utxo> utxos = serial_bridge::_decode_tx(tx, sec_view_key, sec_spend_key, pub_spend_key);
-
-	boost::property_tree::ptree root;
-	boost::property_tree::ptree utxos_ptree;
-	BOOST_FOREACH(Utxo &utxo, utxos)
-	{
-		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
-		auto& out_ptree = out_ptree_pair.second;
-
-		out_ptree.put("tx_id", utxo.tx_id);
-		out_ptree.put("vout", utxo.vout);
-		out_ptree.put("amount", utxo.amount);
-		out_ptree.put("key_image", utxo.key_image);
-		utxos_ptree.push_back(out_ptree_pair);
-	}
-
-	root.add_child("outputs", utxos_ptree);
-
-	return ret_json_from_root(root);
+	return serial_bridge::utxos_to_json(utxos);
 }
