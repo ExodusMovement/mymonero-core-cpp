@@ -68,6 +68,14 @@ namespace serial_bridge
 	};
 
 	//
+	// Helper Functions
+	Transaction json_to_tx(boost::property_tree::ptree tree);
+	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos);
+	bool keys_equal(crypto::public_key a, crypto::public_key b);
+	string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index);
+	vector<Utxo> extract_utxos_from_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
+
+	//
 	// Bridging Functions - these take and return JSON strings
 	string send_step1__prepare_params_for_get_decoys(const string &args_string);
 	string send_step2__try_create_transaction(const string &args_string);
@@ -100,13 +108,8 @@ namespace serial_bridge
 	string decodeRct(const string &args_string);
 	string decodeRctSimple(const string &args_string);
 	string encrypt_payment_id(const string &args_string);
-
-	Transaction json_to_tx(boost::property_tree::ptree tree);
-	string utxos_to_json(vector<Utxo> utxos);
-
-	vector<Utxo> _decode_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
-	string decode_tx(const string &args_string);
-	string decode_txs(const string &args_string);
+	//
+	string extract_utxos(const string &args_string);
 }
 
 #endif /* serial_bridge_index_hpp */
