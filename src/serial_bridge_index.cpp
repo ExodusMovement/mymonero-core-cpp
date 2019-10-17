@@ -189,17 +189,25 @@ vector<Utxo> serial_bridge::extract_utxos_from_tx(Transaction tx, crypto::secret
 
 	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
 	if (!crypto::generate_key_derivation(tx.pub, sec_view_key, derivation)) {
+		throw std::invalid_argument("Couldn't generate key derivation");
 		return utxos;
 	}
 
+	std::string msg = "Derivation: " + epee::string_tools::pod_to_hex(derivation) + "\n";
 	BOOST_FOREACH(Output &output, tx.outputs)
 	{
 		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
 		if (!crypto::derive_public_key(derivation, output.index, pub_spend_key, derived_key)) {
+			throw std::invalid_argument("Couldn't derive public_key");
 			continue;
 		}
 
-		if (!serial_bridge::keys_equal(output.pub, derived_key)) continue;
+		if (!serial_bridge::keys_equal(output.pub, derived_key)) {
+			msg += "Invalid " + epee::string_tools::pod_to_hex(output.pub) + " " + epee::string_tools::pod_to_hex(derived_key) + "\n";
+			continue;
+		}
+
+		throw std::invalid_argument("Found output.");
 
 		Utxo utxo;
 		utxo.tx_id = tx.id;
@@ -212,6 +220,8 @@ vector<Utxo> serial_bridge::extract_utxos_from_tx(Transaction tx, crypto::secret
 
 		utxos.push_back(utxo);
 	}
+
+	throw std::invalid_argument(msg);
 
 	return utxos;
 }
