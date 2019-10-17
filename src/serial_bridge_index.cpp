@@ -116,12 +116,11 @@ Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		tx.rv.outPk.push_back(outPk); // rct keys aren't movable
 	}
 
-	uint8_t curr = 0;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
 	{
 		assert(output_desc.first.empty()); // array elements have no names
 		Output output;
-		output.index = curr++;
+		output.index = stoul(output_desc.second.get<string>("i"));
 
 		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
 			throw std::invalid_argument("Invalid 'tx_desc.outputs.pub'");
