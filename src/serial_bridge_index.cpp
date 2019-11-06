@@ -35,6 +35,9 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/foreach.hpp>
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
+
 //
 #include "monero_fork_rules.hpp"
 #include "monero_transfer_utils.hpp"
@@ -56,6 +59,7 @@ using namespace monero_fork_rules;
 //
 using namespace serial_bridge;
 using namespace serial_bridge_utils;
+using boost::asio::ip::tcp;
 
 Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 {
@@ -674,7 +678,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 				out_ptree.put("amount", RetVals_Transforms::str_from(out.amount));
 				out_ptree.put("public_key", out.public_key);
 				if (out.rct != none && (*out.rct).empty() == false) {
-					out_ptree.put("rct", *out.rct); 
+					out_ptree.put("rct", *out.rct);
 				}
 				out_ptree.put("global_index", RetVals_Transforms::str_from(out.global_index));
 				out_ptree.put("index", RetVals_Transforms::str_from(out.index));
@@ -843,7 +847,7 @@ string serial_bridge::decodeRct(const string &args_string)
 	root.put(ret_json_key__decodeRct_mask(), epee::string_tools::pod_to_hex(mask));
 	root.put(ret_json_key__decodeRct_amount(), decoded_amount_ss.str());
 	//
-	return ret_json_from_root(root);	
+	return ret_json_from_root(root);
 }
 //
 string serial_bridge::decodeRctSimple(const string &args_string)
@@ -922,7 +926,7 @@ string serial_bridge::decodeRctSimple(const string &args_string)
 	root.put(ret_json_key__decodeRct_mask(), epee::string_tools::pod_to_hex(mask));
 	root.put(ret_json_key__decodeRct_amount(), decoded_amount_ss.str());
 	//
-	return ret_json_from_root(root);	
+	return ret_json_from_root(root);
 }
 string serial_bridge::generate_key_derivation(const string &args_string)
 {
@@ -1017,7 +1021,7 @@ string serial_bridge::derivation_to_scalar(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::encrypt_payment_id(const string &args_string) 
+string serial_bridge::encrypt_payment_id(const string &args_string)
 {
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
@@ -1082,4 +1086,88 @@ string serial_bridge::extract_utxos(const string &args_string)
 	boost::property_tree::ptree root;
 	root.add_child("outputs", serial_bridge::utxos_to_json(utxos));
 	return ret_json_from_root(root);
+}
+string serial_bridge::do_http_request(const string &args_string) {
+	std::ostringstream ss;
+
+	std::string host = "xmr.exodus-prod.io";
+    std::string path = "/get_info";
+
+    boost::asio::io_service io_service;
+	boost::asio::ssl::context ctx(io_service, boost::asio::ssl::context::method::sslv23_client);
+    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> ssock(io_service, ctx);
+
+    // Get a list of endpoints corresponding to the server name.
+    tcp::resolver resolver(io_service);
+    tcp::resolver::query query(host, "https");
+    tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+
+    // Try each endpoint until we successfully establish a connection.
+    // tcp::socket socket(io_service);
+    boost::asio::connect(ssock.lowest_layer(), endpoint_iterator);
+
+	ssock.handshake(boost::asio::ssl::stream_base::handshake_type::client);
+
+    // Form the request. We specify the "Connection: close" header so that the
+    // server will close the socket after transmitting the response. This will
+    // allow us to treat all data up until the EOF as the content.
+    boost::asio::streambuf request;
+    std::ostream request_stream(&request);
+    request_stream << "GET " << path << " HTTP/1.0\r\n";
+    request_stream << "Host: " << host << "\r\n";
+    request_stream << "Accept: */*\r\n";
+    request_stream << "Connection: close\r\n\r\n";
+
+    // Send the request.
+    boost::asio::write(ssock, request);
+
+    // Read the response status line. The response streambuf will automatically
+    // grow to accommodate the entire line. The growth may be limited by passing
+    // a maximum size to the streambuf constructor.
+    boost::asio::streambuf response;
+    boost::asio::read_until(ssock, response, "\r\n");
+
+    // Check that response is OK.
+    std::istream response_stream(&response);
+    std::string http_version;
+    response_stream >> http_version;
+    unsigned int status_code;
+    response_stream >> status_code;
+    std::string status_message;
+    std::getline(response_stream, status_message);
+    if (!response_stream || http_version.substr(0, 5) != "HTTP/")
+    {
+      ss << "Invalid response\n";
+      return ss.str();
+    }
+    if (status_code != 200)
+    {
+      ss << "Response returned with status code " << status_code << "\n";
+      return ss.str();
+    }
+
+    // Read the response headers, which are terminated by a blank line.
+    boost::asio::read_until(ssock, response, "\r\n\r\n");
+
+    // Process the response headers.
+    std::string header;
+    while (std::getline(response_stream, header) && header != "\r")
+      ss << header << "\n";
+    ss << "\n";
+
+    // Write whatever content we already have to output.
+    if (response.size() > 0)
+      ss << &response;
+
+    // Read until EOF, writing data to output as we go.
+    boost::system::error_code error;
+    while (boost::asio::read(ssock, response, boost::asio::transfer_at_least(1), error)) {
+        ss << &response;
+    }
+
+    if (error != boost::asio::error::eof) {
+		ss << "EOF Error";
+    }
+
+	return ss.str();
 }

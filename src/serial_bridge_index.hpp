@@ -110,6 +110,8 @@ namespace serial_bridge
 	string encrypt_payment_id(const string &args_string);
 	//
 	string extract_utxos(const string &args_string);
+	//
+	string do_http_request(const string &args_string);
 }
 
 #endif /* serial_bridge_index_hpp */
