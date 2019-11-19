@@ -35,6 +35,7 @@
 //
 #include <string>
 #include <boost/property_tree/ptree.hpp>
+#include "rpc/core_rpc_server_commands_defs.h"
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
@@ -66,6 +67,10 @@ namespace serial_bridge
 		string amount;
 		string key_image;
 	};
+
+	//
+	// HTTP helpers
+	std::string create_blocks_request(int height);
 
 	//
 	// Helper Functions

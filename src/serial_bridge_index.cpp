@@ -45,6 +45,7 @@
 #include "wallet_errors.h"
 #include "string_tools.h"
 #include "ringct/rctSigs.h"
+#include "storages/portable_storage_template_helper.h"
 //
 #include "serial_bridge_utils.hpp"
 
@@ -56,6 +57,22 @@ using namespace monero_fork_rules;
 //
 using namespace serial_bridge;
 using namespace serial_bridge_utils;
+
+std::string serial_bridge::create_blocks_request(int height) {
+	crypto::hash genesis;
+	epee::string_tools::hex_to_pod("418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3", genesis);
+
+	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::request req;
+	req.block_ids.push_back(genesis);
+	req.start_height = height;
+	req.prune = true;
+	req.no_miner_tx = false;
+
+	std::string m_body;
+	epee::serialization::store_t_to_binary(req, m_body);
+
+	return m_body;
+}
 
 Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 {
