@@ -70,7 +70,7 @@ namespace serial_bridge
 
 	//
 	// HTTP helpers
-	std::string create_blocks_request(int height);
+	const char *create_blocks_request(int height, size_t *length);
 
 	//
 	// Helper Functions

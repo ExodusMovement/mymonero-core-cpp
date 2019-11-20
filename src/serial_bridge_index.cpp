@@ -58,7 +58,7 @@ using namespace monero_fork_rules;
 using namespace serial_bridge;
 using namespace serial_bridge_utils;
 
-std::string serial_bridge::create_blocks_request(int height) {
+const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	crypto::hash genesis;
 	epee::string_tools::hex_to_pod("418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3", genesis);
 
@@ -71,7 +71,11 @@ std::string serial_bridge::create_blocks_request(int height) {
 	std::string m_body;
 	epee::serialization::store_t_to_binary(req, m_body);
 
-	return m_body;
+	*length = m_body.length();
+	char *arr =  (char *)malloc(m_body.length());
+	std::copy(m_body.begin(), m_body.end(), arr);
+
+	return (const char *) arr;
 }
 
 Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
