@@ -72,10 +72,7 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	epee::serialization::store_t_to_binary(req, m_body);
 
 	*length = m_body.length();
-	char *arr =  (char *)malloc(m_body.length());
-	std::copy(m_body.begin(), m_body.end(), arr);
-
-	return (const char *) arr;
+	return m_body.c_str();
 }
 
 Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
