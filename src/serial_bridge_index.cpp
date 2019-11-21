@@ -78,6 +78,15 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	return (const char *) arr;
 }
 
+int serial_bridge::extract_utxos_from_blocks_response(const char *buffer, size_t length) {
+	std::string m_body(buffer, length);
+
+	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::response resp;
+	epee::serialization::load_t_from_binary(resp, m_body);
+
+	return resp.current_height;
+}
+
 Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 {
 	Transaction tx;

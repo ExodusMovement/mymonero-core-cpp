@@ -71,6 +71,7 @@ namespace serial_bridge
 	//
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
+	int extract_utxos_from_blocks_response(const char *buffer, size_t length);
 
 	//
 	// Helper Functions
