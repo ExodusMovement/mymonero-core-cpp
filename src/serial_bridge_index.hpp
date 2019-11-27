@@ -37,6 +37,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "cryptonote_config.h"
+#include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 //
@@ -61,22 +62,42 @@ namespace serial_bridge
 		vector<Output> outputs;
 	};
 
-	struct Utxo {
+	struct UtxoBase {
 		string tx_id;
 		uint8_t vout;
 		string amount;
 		string key_image;
 	};
 
+	struct Utxo: public UtxoBase {
+		crypto::public_key tx_pub;
+		crypto::public_key pub;
+		std::string rv;
+		uint64_t global_index;
+		size_t block_height;
+	};
+
+	struct NativeResponse {
+		uint64_t current_height;
+		std::vector<crypto::key_image> input_images;
+		std::vector<Utxo> utxos;
+	};
+
 	//
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
-	int extract_utxos_from_blocks_response(const char *buffer, size_t length);
+	NativeResponse extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
+	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 
 	//
 	// Helper Functions
+	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
+	std::vector<crypto::key_image> get_input_images(const cryptonote::transaction &tx);
+	std::vector<Output> get_outputs(const cryptonote::transaction &tx);
+	std::string build_rct(const rct::rctSig &rv, size_t index);
 	Transaction json_to_tx(boost::property_tree::ptree tree);
-	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos);
+	boost::property_tree::ptree key_images_to_json(std::vector<crypto::key_image> images);
+	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos, bool extras = false);
 	bool keys_equal(crypto::public_key a, crypto::public_key b);
 	string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index);
 	vector<Utxo> extract_utxos_from_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
