@@ -152,6 +152,12 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			}
 
 			auto inputs = get_inputs(tx, bridge_tx);
+
+			for (size_t k = 0; k < inputs.size(); k++) {
+				auto &input = inputs[k];
+				input.block_height = height;
+			}
+
 			native_resp.inputs.insert(native_resp.inputs.end(), std::begin(inputs), std::end(inputs));
 
 			auto tx_utxos = extract_utxos_from_tx(bridge_tx, sec_view_key, sec_spend_key, pub_spend_key);
@@ -366,6 +372,7 @@ boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<Input> inp
 
 		boost::property_tree::ptree input_tree;
 		input_tree.put("i", input.tx_id);
+		input_tree.put("b", input.block_height);
 		input_tree.put("t", input.timestamp);
 		input_tree.put("m", epee::string_tools::pod_to_hex(input.image));
 		input_tree.put("f", input.fee_amount);

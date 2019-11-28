@@ -82,6 +82,7 @@ namespace serial_bridge
 
 	struct Input {
 		std::string tx_id;
+		size_t block_height;
 		uint64_t timestamp;
 		crypto::key_image image;
 		crypto::hash payment_id = crypto::null_hash;
