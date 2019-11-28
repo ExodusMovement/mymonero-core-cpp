@@ -138,15 +138,21 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
 			if (!extra_parsed) continue;
 
-			auto images = get_input_images(tx);
-			native_resp.input_images.insert(native_resp.input_images.end(), std::begin(images), std::end(images));
-
 			Transaction bridge_tx;
 			bridge_tx.id = epee::string_tools::pod_to_hex(b.tx_hashes[j]);
+			bridge_tx.timestamp = b.timestamp;
 			bridge_tx.pub = get_extra_pub_key(fields);
 			bridge_tx.version = tx.version;
 			bridge_tx.rv = tx.rct_signatures;
 			bridge_tx.outputs = get_outputs(tx);
+
+			auto nonce = get_extra_nonce(fields);
+			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
+				cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
+			}
+
+			auto inputs = get_inputs(tx, bridge_tx);
+			native_resp.inputs.insert(native_resp.inputs.end(), std::begin(inputs), std::end(inputs));
 
 			auto tx_utxos = extract_utxos_from_tx(bridge_tx, sec_view_key, sec_spend_key, pub_spend_key);
 
@@ -169,7 +175,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
 
 	boost::property_tree::ptree root;
-	root.add_child("prefixes", serial_bridge::key_images_to_json(resp.input_images));
+	root.add_child("inputs", serial_bridge::inputs_to_json(resp.inputs));
 	root.add_child("outputs", serial_bridge::utxos_to_json(resp.utxos, true));
 	root.put("current_height", resp.current_height);
 
@@ -186,17 +192,56 @@ crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote
 	return crypto::public_key{};
 }
 
-std::vector<crypto::key_image> serial_bridge::get_input_images(const cryptonote::transaction &tx) {
-	std::vector<crypto::key_image> input_images;
+std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields) {
+	 for (size_t n = 0; n < fields.size(); ++n) {
+		if (typeid(cryptonote::tx_extra_nonce) == fields[n].type()) {
+			return boost::get<cryptonote::tx_extra_nonce>(fields[n]).nonce;
+		}
+	}
+
+	return "";
+}
+
+std::vector<Input> serial_bridge::get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx) {
+	std::vector<Input> inputs;
+
+	rct::xmr_amount fee_amount = 0;
+	if (bridge_tx.version == 1) {
+		for (size_t i = 0; i < tx.vin.size(); i++) {
+			auto &in = tx.vin[i];
+			if (in.type() != typeid(cryptonote::txin_to_key)) continue;
+
+			fee_amount += boost::get<cryptonote::txin_to_key>(in).amount;
+		}
+
+		for (size_t i = 0; i < tx.vout.size(); i++) {
+			auto &out = tx.vout[i];
+			fee_amount -= out.amount;
+		}
+	}
 
 	for (size_t i = 0; i < tx.vin.size(); i++) {
 		auto tx_in = tx.vin[i];
 
+		Input input;
+		input.tx_id = bridge_tx.id;
+		input.timestamp = bridge_tx.timestamp;
+		input.payment_id = bridge_tx.payment_id;
+		input.payment_id8 = bridge_tx.payment_id8;
+
+		if (bridge_tx.version == 2) {
+			input.fee_amount = bridge_tx.rv.txnFee;
+		} else {
+			input.fee_amount = fee_amount;
+		}
+
 		if (tx_in.type() != typeid(cryptonote::txin_to_key)) continue;
-		input_images.push_back(boost::get<cryptonote::txin_to_key>(tx_in).k_image);
+		input.image = boost::get<cryptonote::txin_to_key>(tx_in).k_image;
+
+		inputs.push_back(input);
 	}
 
-	return input_images;
+	return inputs;
 }
 
 std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx) {
@@ -313,17 +358,27 @@ Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 
 	return tx;
 }
-boost::property_tree::ptree serial_bridge::key_images_to_json(std::vector<crypto::key_image> images) {
-	boost::property_tree::ptree images_ptree;
+boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<Input> inputs) {
+	boost::property_tree::ptree root;
 
-	for (int i = 0; i < images.size(); i++) {
-		boost::property_tree::ptree child;
-		child.put("", epee::string_tools::pod_to_hex(images[i]));
+	for (int i = 0; i < inputs.size(); i++) {
+		auto &input = inputs[i];
 
-		images_ptree.push_back(std::make_pair("", child));
+		boost::property_tree::ptree input_tree;
+		input_tree.put("i", input.tx_id);
+		input_tree.put("t", input.timestamp);
+		input_tree.put("m", epee::string_tools::pod_to_hex(input.image));
+		input_tree.put("f", input.fee_amount);
+		if (input.payment_id8 != crypto::null_hash8) {
+			input_tree.put("e", epee::string_tools::pod_to_hex(input.payment_id8));
+		} else if (input.payment_id != crypto::null_hash) {
+			input_tree.put("p", epee::string_tools::pod_to_hex(input.payment_id));
+		}
+
+		root.push_back(std::make_pair("", input_tree));
 	}
 
-	return images_ptree;
+	return root;
 }
 boost::property_tree::ptree serial_bridge::utxos_to_json(vector<Utxo> utxos, bool extras)
 {

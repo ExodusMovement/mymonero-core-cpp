@@ -56,7 +56,10 @@ namespace serial_bridge
 
 	struct Transaction {
 		string id;
+		uint64_t timestamp;
 		crypto::public_key pub;
+		crypto::hash payment_id = crypto::null_hash;
+		crypto::hash8 payment_id8 = crypto::null_hash8;
 		uint8_t version;
 		rct::rctSig rv;
 		vector<Output> outputs;
@@ -77,9 +80,19 @@ namespace serial_bridge
 		size_t block_height;
 	};
 
+	struct Input {
+		std::string tx_id;
+		uint64_t timestamp;
+		crypto::key_image image;
+		crypto::hash payment_id = crypto::null_hash;
+		crypto::hash8 payment_id8 = crypto::null_hash8;
+		rct::xmr_amount fee_amount = 0;
+		std::string amount;
+	};
+
 	struct NativeResponse {
 		uint64_t current_height;
-		std::vector<crypto::key_image> input_images;
+		std::vector<Input> inputs;
 		std::vector<Utxo> utxos;
 	};
 
@@ -92,11 +105,12 @@ namespace serial_bridge
 	//
 	// Helper Functions
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
-	std::vector<crypto::key_image> get_input_images(const cryptonote::transaction &tx);
+	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
+	std::vector<Input> get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx);
 	std::vector<Output> get_outputs(const cryptonote::transaction &tx);
 	std::string build_rct(const rct::rctSig &rv, size_t index);
 	Transaction json_to_tx(boost::property_tree::ptree tree);
-	boost::property_tree::ptree key_images_to_json(std::vector<crypto::key_image> images);
+	boost::property_tree::ptree inputs_to_json(std::vector<Input> inputs);
 	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos, bool extras = false);
 	bool keys_equal(crypto::public_key a, crypto::public_key b);
 	string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index);
