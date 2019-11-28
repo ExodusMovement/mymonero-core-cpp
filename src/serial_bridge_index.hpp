@@ -54,17 +54,6 @@ namespace serial_bridge
 		string amount;
 	};
 
-	struct Transaction {
-		string id;
-		uint64_t timestamp;
-		crypto::public_key pub;
-		crypto::hash payment_id = crypto::null_hash;
-		crypto::hash8 payment_id8 = crypto::null_hash8;
-		uint8_t version;
-		rct::rctSig rv;
-		vector<Output> outputs;
-	};
-
 	struct UtxoBase {
 		string tx_id;
 		uint8_t vout;
@@ -80,21 +69,24 @@ namespace serial_bridge
 		size_t block_height;
 	};
 
-	struct Input {
-		std::string tx_id;
-		size_t block_height;
+	struct Transaction {
+		std::string id;
+		uint8_t version;
 		uint64_t timestamp;
-		crypto::key_image image;
+		size_t block_height;
+		rct::rctSig rv;
+		crypto::public_key pub;
 		crypto::hash payment_id = crypto::null_hash;
 		crypto::hash8 payment_id8 = crypto::null_hash8;
 		rct::xmr_amount fee_amount = 0;
-		std::string amount;
+		std::vector<crypto::key_image> inputs;
+		std::vector<Output> outputs;
+		std::vector<Utxo> utxos;
 	};
 
 	struct NativeResponse {
 		uint64_t current_height;
-		std::vector<Input> inputs;
-		std::vector<Utxo> utxos;
+		std::vector<Transaction> txs;
 	};
 
 	//
@@ -107,12 +99,13 @@ namespace serial_bridge
 	// Helper Functions
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
-	std::vector<Input> get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx);
+	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx);
 	std::vector<Output> get_outputs(const cryptonote::transaction &tx);
+	rct::xmr_amount get_fee(const cryptonote::transaction &tx, const Transaction &bridge_tx);
 	std::string build_rct(const rct::rctSig &rv, size_t index);
 	Transaction json_to_tx(boost::property_tree::ptree tree);
-	boost::property_tree::ptree inputs_to_json(std::vector<Input> inputs);
-	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos, bool extras = false);
+	boost::property_tree::ptree inputs_to_json(std::vector<crypto::key_image> inputs);
+	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos, bool native = false);
 	bool keys_equal(crypto::public_key a, crypto::public_key b);
 	string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index);
 	vector<Utxo> extract_utxos_from_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
