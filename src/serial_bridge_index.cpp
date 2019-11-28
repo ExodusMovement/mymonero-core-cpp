@@ -105,6 +105,14 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 		return native_resp;
 	}
 
+	std::map<std::string, bool> gki;
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &image_desc, json_root.get_child("key_images"))
+	{
+		assert(image_desc.first.empty());
+
+		gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
+	}
+
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::response resp;
@@ -146,7 +154,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			bridge_tx.rv = tx.rct_signatures;
 			bridge_tx.pub = get_extra_pub_key(fields);
 			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
-			bridge_tx.inputs = get_inputs(tx, bridge_tx);
+			bridge_tx.inputs = get_inputs(tx, bridge_tx, gki);
 
 			auto nonce = get_extra_nonce(fields);
 			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
@@ -229,14 +237,19 @@ std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extr
 	return "";
 }
 
-std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx) {
+std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx, const std::map<std::string, bool> &gki) {
 	std::vector<crypto::key_image> inputs;
 
 	for (size_t i = 0; i < tx.vin.size(); i++) {
 		auto &tx_in = tx.vin[i];
 		if (tx_in.type() != typeid(cryptonote::txin_to_key)) continue;
 
-		inputs.push_back(boost::get<cryptonote::txin_to_key>(tx_in).k_image);
+		auto image = boost::get<cryptonote::txin_to_key>(tx_in).k_image;
+
+		auto it = gki.find(epee::string_tools::pod_to_hex(image));
+		if (it == gki.end()) continue;
+
+		inputs.push_back(image);
 	}
 
 	return inputs;
@@ -411,7 +424,6 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(vector<Utxo> utxos, boo
 			out_ptree.put("rv", utxo.rv);
 		} else {
 			out_ptree.put("tx_id", utxo.tx_id);
-
 		}
 
 		utxos_ptree.push_back(out_ptree_pair);
