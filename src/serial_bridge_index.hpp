@@ -84,9 +84,22 @@ namespace serial_bridge
 		std::vector<utxo> utxos;
 	};
 
+	struct mixin {
+		uint64_t global_index;
+		crypto::public_key public_key;
+		std::string rct;
+	};
+
+	struct pruned_block {
+		size_t block_height;
+		uint64_t timestamp;
+		std::vector<mixin> mixins;
+	};
+
 	struct native_response {
 		uint64_t current_height;
 		std::vector<bridge_tx> txs;
+		std::vector<pruned_block> pruned_blocks;
 	};
 
 	//

@@ -120,10 +120,12 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 
 	auto blocks = resp.blocks;
 
-	cryptonote::block b;
-	cryptonote::transaction tx;
 	for (size_t i = 0; i < resp.blocks.size(); i++) {
 		auto block_entry = resp.blocks[i];
+
+		pruned_block pruned_block;
+		cryptonote::block b;
+
 		crypto::hash block_hash;
 		if (!parse_and_validate_block_from_blob(block_entry.block, b, block_hash)) {
 			continue;
@@ -136,8 +138,12 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 
 		int height = boost::get<cryptonote::txin_gen>(gen_tx).height;
 
+		pruned_block.block_height = height;
+		pruned_block.timestamp = b.timestamp;
 		for (size_t j = 0; j < block_entry.txs.size(); j++) {
 			auto tx_entry = block_entry.txs[j];
+
+			cryptonote::transaction tx;
 
 			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_entry.blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_entry.blob, tx);
 			if (!tx_parsed) continue;
@@ -162,6 +168,20 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			}
 
 			bridge_tx.outputs = get_outputs(tx);
+
+			if (bridge_tx.version == 2) {
+				for (size_t k = 0; k < bridge_tx.outputs.size(); k++) {
+					auto &output = bridge_tx.outputs[k];
+
+					mixin mixin;
+					mixin.global_index = resp.output_indices[i].indices[j + 1].indices[output.index];
+					mixin.public_key = output.pub;
+					mixin.rct = build_rct(bridge_tx.rv, output.index);
+
+					pruned_block.mixins.push_back(mixin);
+				}
+			}
+
 			auto tx_utxos = extract_utxos_from_tx(bridge_tx, sec_view_key, sec_spend_key, pub_spend_key);
 
 			for (size_t k = 0; k < tx_utxos.size(); k++) {
@@ -175,6 +195,8 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 				native_resp.txs.push_back(bridge_tx);
 			}
 		}
+
+		native_resp.pruned_blocks.push_back(pruned_block);
 	}
 
 	native_resp.current_height = resp.current_height;
@@ -210,8 +232,34 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 
 		txs_tree.push_back(std::make_pair("", tx_tree));
 	}
-
 	root.add_child("txs", txs_tree);
+
+	boost::property_tree::ptree blocks_tree;
+	for (int i = 0; i < resp.pruned_blocks.size(); i++) {
+		auto &block = resp.pruned_blocks[i];
+
+		boost::property_tree::ptree block_tree;
+
+		block_tree.put("h", block.block_height);
+		block_tree.put("t", block.timestamp);
+
+		boost::property_tree::ptree mixins_tree;
+		for (int j = 0; j < block.mixins.size(); j++) {
+			auto &mixin = block.mixins[j];
+
+			boost::property_tree::ptree mixin_tree;
+			mixin_tree.put("i", mixin.global_index);
+			mixin_tree.put("p", epee::string_tools::pod_to_hex(mixin.public_key));
+			mixin_tree.put("r", mixin.rct);
+
+			mixins_tree.push_back(std::make_pair("", mixin_tree));
+		}
+		block_tree.add_child("m", mixins_tree);
+
+		blocks_tree.push_back(std::make_pair("", block_tree));
+	}
+	root.add_child("blocks", blocks_tree);
+
 	root.put("current_height", resp.current_height);
 
 	return ret_json_from_root(root);
