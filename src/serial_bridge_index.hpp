@@ -48,20 +48,20 @@ namespace serial_bridge
 	using namespace std;
 	using namespace cryptonote;
 
-	struct Output {
+	struct output {
 		uint8_t index;
 		crypto::public_key pub;
 		string amount;
 	};
 
-	struct UtxoBase {
+	struct utxo_base {
 		string tx_id;
 		uint8_t vout;
 		string amount;
 		string key_image;
 	};
 
-	struct Utxo: public UtxoBase {
+	struct utxo: public utxo_base {
 		crypto::public_key tx_pub;
 		crypto::public_key pub;
 		std::string rv;
@@ -69,7 +69,7 @@ namespace serial_bridge
 		size_t block_height;
 	};
 
-	struct Transaction {
+	struct bridge_tx {
 		std::string id;
 		uint8_t version;
 		uint64_t timestamp;
@@ -80,35 +80,35 @@ namespace serial_bridge
 		crypto::hash8 payment_id8 = crypto::null_hash8;
 		rct::xmr_amount fee_amount = 0;
 		std::vector<crypto::key_image> inputs;
-		std::vector<Output> outputs;
-		std::vector<Utxo> utxos;
+		std::vector<output> outputs;
+		std::vector<utxo> utxos;
 	};
 
-	struct NativeResponse {
+	struct native_response {
 		uint64_t current_height;
-		std::vector<Transaction> txs;
+		std::vector<bridge_tx> txs;
 	};
 
 	//
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
-	NativeResponse extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
+	native_response extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 
 	//
 	// Helper Functions
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
-	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx, const std::map<std::string, bool> &gbi);
-	std::vector<Output> get_outputs(const cryptonote::transaction &tx);
-	rct::xmr_amount get_fee(const cryptonote::transaction &tx, const Transaction &bridge_tx);
+	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, const std::map<std::string, bool> &gbi);
+	std::vector<output> get_outputs(const cryptonote::transaction &tx);
+	rct::xmr_amount get_fee(const cryptonote::transaction &tx, const bridge_tx &bridge_tx);
 	std::string build_rct(const rct::rctSig &rv, size_t index);
-	Transaction json_to_tx(boost::property_tree::ptree tree);
+	bridge_tx json_to_tx(boost::property_tree::ptree tree);
 	boost::property_tree::ptree inputs_to_json(std::vector<crypto::key_image> inputs);
-	boost::property_tree::ptree utxos_to_json(vector<Utxo> utxos, bool native = false);
+	boost::property_tree::ptree utxos_to_json(std::vector<utxo> utxos, bool native = false);
 	bool keys_equal(crypto::public_key a, crypto::public_key b);
-	string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index);
-	vector<Utxo> extract_utxos_from_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
+	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
+	std::vector<utxo> extract_utxos_from_tx(bridge_tx tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
 
 	//
 	// Bridging Functions - these take and return JSON strings

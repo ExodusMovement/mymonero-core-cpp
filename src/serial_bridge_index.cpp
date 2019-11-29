@@ -78,8 +78,8 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	return (const char *) arr;
 }
 
-NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
-	NativeResponse native_resp;
+native_response serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
+	native_response native_resp;
 
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
@@ -146,7 +146,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
 			if (!extra_parsed) continue;
 
-			Transaction bridge_tx;
+			bridge_tx bridge_tx;
 			bridge_tx.id = epee::string_tools::pod_to_hex(b.tx_hashes[j]);
 			bridge_tx.version = tx.version;
 			bridge_tx.timestamp = b.timestamp;
@@ -237,7 +237,7 @@ std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extr
 	return "";
 }
 
-std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const Transaction &bridge_tx, const std::map<std::string, bool> &gki) {
+std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, const std::map<std::string, bool> &gki) {
 	std::vector<crypto::key_image> inputs;
 
 	for (size_t i = 0; i < tx.vin.size(); i++) {
@@ -255,8 +255,8 @@ std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::trans
 	return inputs;
 }
 
-std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx) {
-	std::vector<Output> outputs;
+std::vector<output> serial_bridge::get_outputs(const cryptonote::transaction &tx) {
+	std::vector<output> outputs;
 
 	for (size_t i = 0; i < tx.vout.size(); i++) {
 		auto tx_out = tx.vout[i];
@@ -264,7 +264,7 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 		if (tx_out.target.type() != typeid(cryptonote::txout_to_key)) continue;
 		auto target = boost::get<cryptonote::txout_to_key>(tx_out.target);
 
-		Output output;
+		output output;
 		output.index = i;
 		output.pub = target.key;
 		output.amount = std::to_string(tx_out.amount);
@@ -275,7 +275,7 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 	return outputs;
 }
 
-rct::xmr_amount serial_bridge::get_fee(const cryptonote::transaction &tx, const Transaction &bridge_tx) {
+rct::xmr_amount serial_bridge::get_fee(const cryptonote::transaction &tx, const bridge_tx &bridge_tx) {
 	if (bridge_tx.version == 2) {
 		return bridge_tx.rv.txnFee;
 	}
@@ -317,9 +317,9 @@ std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index) {
 	}
 }
 
-Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
+bridge_tx serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 {
-	Transaction tx;
+	bridge_tx tx;
 
 	tx.id = tx_desc.get<string>("id");
 
@@ -380,7 +380,7 @@ Transaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
 	{
 		assert(output_desc.first.empty()); // array elements have no names
-		Output output;
+		output output;
 		output.index = curr++;
 
 		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
@@ -406,10 +406,10 @@ boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<crypto::ke
 
 	return root;
 }
-boost::property_tree::ptree serial_bridge::utxos_to_json(vector<Utxo> utxos, bool native)
+boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<utxo> utxos, bool native)
 {
 	boost::property_tree::ptree utxos_ptree;
-	BOOST_FOREACH(Utxo &utxo, utxos)
+	BOOST_FOREACH(auto &utxo, utxos)
 	{
 		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
 		auto& out_ptree = out_ptree_pair.second;
@@ -435,7 +435,7 @@ bool serial_bridge::keys_equal(crypto::public_key a, crypto::public_key b)
 {
 	return equal(a.data, a.data + 32, b.data);
 }
-string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, string amount, int index)
+string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index)
 {
 	if (version == 1) {
 		return amount;
@@ -464,16 +464,16 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 
 	return "";
 }
-vector<Utxo> serial_bridge::extract_utxos_from_tx(Transaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key)
+std::vector<utxo> serial_bridge::extract_utxos_from_tx(bridge_tx tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key)
 {
-	vector<Utxo> utxos;
+	std::vector<utxo> utxos;
 
 	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
 	if (!crypto::generate_key_derivation(tx.pub, sec_view_key, derivation)) {
 		return utxos;
 	}
 
-	BOOST_FOREACH(Output &output, tx.outputs)
+	BOOST_FOREACH(auto &output, tx.outputs)
 	{
 		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
 		if (!crypto::derive_public_key(derivation, output.index, pub_spend_key, derived_key)) {
@@ -482,7 +482,7 @@ vector<Utxo> serial_bridge::extract_utxos_from_tx(Transaction tx, crypto::secret
 
 		if (!serial_bridge::keys_equal(output.pub, derived_key)) continue;
 
-		Utxo utxo;
+		utxo utxo;
 		utxo.tx_id = tx.id;
 		utxo.vout = output.index;
 		utxo.amount = serial_bridge::decode_amount(tx.version, derivation, tx.rv, output.amount, output.index);
@@ -1348,7 +1348,7 @@ string serial_bridge::extract_utxos(const string &args_string)
 		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
 	}
 
-	vector<Utxo> utxos;
+	std::vector<utxo> utxos;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
 	{
 		assert(tx_desc.first.empty());
