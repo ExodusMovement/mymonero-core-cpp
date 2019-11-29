@@ -166,7 +166,7 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 
 			for (size_t k = 0; k < tx_utxos.size(); k++) {
 				auto &utxo = tx_utxos[k];
-				utxo.global_index = resp.output_indices[i].indices[j].indices[utxo.vout];
+				utxo.global_index = resp.output_indices[i].indices[j + 1].indices[utxo.vout];
 			}
 
 			bridge_tx.utxos = tx_utxos;
