@@ -98,6 +98,7 @@ namespace serial_bridge
 
 	struct native_response {
 		uint64_t current_height;
+		uint64_t end_height = 0;
 		std::vector<bridge_tx> txs;
 		uint64_t latest;
 		uint64_t oldest;

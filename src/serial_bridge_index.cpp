@@ -143,7 +143,7 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			continue;
 		}
 
-		int height = boost::get<cryptonote::txin_gen>(gen_tx).height;
+		uint64_t height = boost::get<cryptonote::txin_gen>(gen_tx).height;
 
 		pruned_block.block_height = height;
 		pruned_block.timestamp = b.timestamp;
@@ -214,6 +214,8 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			oldest = std::min(oldest, pruned_block.block_height);
 			size += 1;
 		}
+
+		native_resp.end_height = std::max(native_resp.end_height, height);
 	}
 
 	native_resp.current_height = resp.current_height;
@@ -229,6 +231,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 
 	boost::property_tree::ptree root;
 	root.put("current_height", resp.current_height);
+	root.put("end_height", resp.end_height);
 	root.put("latest", resp.latest);
 	root.put("oldest", resp.oldest);
 	root.put("size", resp.size);
