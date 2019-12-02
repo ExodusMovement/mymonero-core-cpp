@@ -32,6 +32,7 @@
 //
 #include "serial_bridge_index.hpp"
 //
+#include <algorithm>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/foreach.hpp>
@@ -104,6 +105,12 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 		// TODO: Set error flag
 		return native_resp;
 	}
+
+	std::string storage_path = json_root.get<string>("storage_path");
+	uint8_t storage_rate = json_root.get<uint8_t>("storage_percent");
+	uint64_t latest = json_root.get<uint64_t>("latest");
+	uint64_t oldest = json_root.get<uint64_t>("oldest");
+	uint64_t size = json_root.get<uint64_t>("size");
 
 	std::map<std::string, bool> gki;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &image_desc, json_root.get_child("key_images"))
@@ -196,10 +203,23 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			}
 		}
 
-		native_resp.pruned_blocks.push_back(pruned_block);
+		if (pruned_block.block_height >= oldest && pruned_block.block_height <= latest) continue;
+		if (size <= 100 || arc4random_uniform(100) < storage_rate) {
+			std::ofstream f;
+			f.open(storage_path + std::to_string(pruned_block.block_height) + ".json");
+			f << ret_json_from_root(pruned_block_to_json(pruned_block));
+			f.close();
+
+			latest = std::max(latest, pruned_block.block_height);
+			oldest = std::min(oldest, pruned_block.block_height);
+			size += 1;
+		}
 	}
 
 	native_resp.current_height = resp.current_height;
+	native_resp.latest = latest;
+	native_resp.oldest = oldest;
+	native_resp.size = size;
 
 	return native_resp;
 }
@@ -208,6 +228,10 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
 
 	boost::property_tree::ptree root;
+	root.put("current_height", resp.current_height);
+	root.put("latest", resp.latest);
+	root.put("oldest", resp.oldest);
+	root.put("size", resp.size);
 
 	boost::property_tree::ptree txs_tree;
 	for (int i = 0; i < resp.txs.size(); i++) {
@@ -233,34 +257,6 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 		txs_tree.push_back(std::make_pair("", tx_tree));
 	}
 	root.add_child("txs", txs_tree);
-
-	boost::property_tree::ptree blocks_tree;
-	for (int i = 0; i < resp.pruned_blocks.size(); i++) {
-		auto &block = resp.pruned_blocks[i];
-
-		boost::property_tree::ptree block_tree;
-
-		block_tree.put("h", block.block_height);
-		block_tree.put("t", block.timestamp);
-
-		boost::property_tree::ptree mixins_tree;
-		for (int j = 0; j < block.mixins.size(); j++) {
-			auto &mixin = block.mixins[j];
-
-			boost::property_tree::ptree mixin_tree;
-			mixin_tree.put("i", mixin.global_index);
-			mixin_tree.put("p", epee::string_tools::pod_to_hex(mixin.public_key));
-			mixin_tree.put("r", mixin.rct);
-
-			mixins_tree.push_back(std::make_pair("", mixin_tree));
-		}
-		block_tree.add_child("m", mixins_tree);
-
-		blocks_tree.push_back(std::make_pair("", block_tree));
-	}
-	root.add_child("blocks", blocks_tree);
-
-	root.put("current_height", resp.current_height);
 
 	return ret_json_from_root(root);
 }
@@ -479,6 +475,30 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<utxo> utxos
 
 	return utxos_ptree;
 }
+
+boost::property_tree::ptree serial_bridge::pruned_block_to_json(const pruned_block &pruned_block) {
+	boost::property_tree::ptree block_tree;
+
+	block_tree.put("id", pruned_block.block_height);
+	block_tree.put("timestamp", pruned_block.timestamp);
+
+	boost::property_tree::ptree mixins_tree;
+	for (int i = 0; i < pruned_block.mixins.size(); i++) {
+		auto &mixin = pruned_block.mixins[i];
+
+		boost::property_tree::ptree mixin_tree;
+		mixin_tree.put("global_index", mixin.global_index);
+		mixin_tree.put("public_key", epee::string_tools::pod_to_hex(mixin.public_key));
+		mixin_tree.put("rct", mixin.rct);
+
+		mixins_tree.push_back(std::make_pair("", mixin_tree));
+	}
+
+	block_tree.add_child("mixins", mixins_tree);
+
+	return block_tree;
+}
+
 bool serial_bridge::keys_equal(crypto::public_key a, crypto::public_key b)
 {
 	return equal(a.data, a.data + 32, b.data);

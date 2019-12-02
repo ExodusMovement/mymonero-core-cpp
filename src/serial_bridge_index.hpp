@@ -66,14 +66,14 @@ namespace serial_bridge
 		crypto::public_key pub;
 		std::string rv;
 		uint64_t global_index;
-		size_t block_height;
+		uint64_t block_height;
 	};
 
 	struct bridge_tx {
 		std::string id;
 		uint8_t version;
 		uint64_t timestamp;
-		size_t block_height;
+		uint64_t block_height;
 		rct::rctSig rv;
 		crypto::public_key pub;
 		crypto::hash payment_id = crypto::null_hash;
@@ -91,7 +91,7 @@ namespace serial_bridge
 	};
 
 	struct pruned_block {
-		size_t block_height;
+		uint64_t block_height;
 		uint64_t timestamp;
 		std::vector<mixin> mixins;
 	};
@@ -99,7 +99,9 @@ namespace serial_bridge
 	struct native_response {
 		uint64_t current_height;
 		std::vector<bridge_tx> txs;
-		std::vector<pruned_block> pruned_blocks;
+		uint64_t latest;
+		uint64_t oldest;
+		uint64_t size;
 	};
 
 	//
@@ -119,6 +121,7 @@ namespace serial_bridge
 	bridge_tx json_to_tx(boost::property_tree::ptree tree);
 	boost::property_tree::ptree inputs_to_json(std::vector<crypto::key_image> inputs);
 	boost::property_tree::ptree utxos_to_json(std::vector<utxo> utxos, bool native = false);
+	boost::property_tree::ptree pruned_block_to_json(const pruned_block &pruned_block);
 	bool keys_equal(crypto::public_key a, crypto::public_key b);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
 	std::vector<utxo> extract_utxos_from_tx(bridge_tx tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
