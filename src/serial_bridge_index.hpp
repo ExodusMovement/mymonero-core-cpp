@@ -97,6 +97,7 @@ namespace serial_bridge
 	};
 
 	struct native_response {
+		std::string error;
 		uint64_t current_height;
 		uint64_t end_height = 0;
 		std::vector<bridge_tx> txs;

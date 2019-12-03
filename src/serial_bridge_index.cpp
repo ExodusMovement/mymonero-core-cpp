@@ -84,25 +84,25 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
-		// TODO: Set error flag
+		native_resp.error = "Invalid JSON";
 		return native_resp;
 	}
 
 	crypto::secret_key sec_view_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), sec_view_key)) {
-		// TODO: Set error flag
+		native_resp.error = "Invalid 'sec_viewKey_string'";
 		return native_resp;
 	}
 
 	crypto::secret_key sec_spend_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key)) {
-		// TODO: Set error flag
+		native_resp.error = "Invalid 'sec_spendKey_string'";
 		return native_resp;
 	}
 
 	crypto::public_key pub_spend_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
-		// TODO: Set error flag
+		native_resp.error = "Invalid 'pub_spendKey_string'";
 		return native_resp;
 	}
 
@@ -230,6 +230,12 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
 
 	boost::property_tree::ptree root;
+
+	if (!resp.error.empty()) {
+		root.put(ret_json_key__any__err_msg(), resp.error);
+		return ret_json_from_root(root);
+	}
+
 	root.put("current_height", resp.current_height);
 	root.put("end_height", resp.end_height);
 	root.put("latest", resp.latest);
