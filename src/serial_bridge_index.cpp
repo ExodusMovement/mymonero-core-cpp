@@ -194,6 +194,8 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			for (size_t k = 0; k < tx_utxos.size(); k++) {
 				auto &utxo = tx_utxos[k];
 				utxo.global_index = resp.output_indices[i].indices[j + 1].indices[utxo.vout];
+
+				gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
 			}
 
 			bridge_tx.utxos = tx_utxos;
@@ -290,7 +292,7 @@ std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extr
 	return "";
 }
 
-std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, const std::map<std::string, bool> &gki) {
+std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, std::map<std::string, bool> &gki) {
 	std::vector<crypto::key_image> inputs;
 
 	for (size_t i = 0; i < tx.vin.size(); i++) {
@@ -301,6 +303,8 @@ std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::trans
 
 		auto it = gki.find(epee::string_tools::pod_to_hex(image));
 		if (it == gki.end()) continue;
+
+		gki.erase(it);
 
 		inputs.push_back(image);
 	}
