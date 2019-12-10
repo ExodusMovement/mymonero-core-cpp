@@ -365,10 +365,10 @@ std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index) {
 		case rct::RCTTypeBulletproof:
 			return epee::string_tools::pod_to_hex(rv.outPk[index].mask) +
 				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].mask) +
-				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount);
+				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount).substr(0, 16);
 		case rct::RCTTypeBulletproof2:
 			return epee::string_tools::pod_to_hex(rv.outPk[index].mask) +
-				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount);
+				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount).substr(0, 16);
 		default:
 			return "";
 	}
