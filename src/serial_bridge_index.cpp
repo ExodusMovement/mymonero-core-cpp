@@ -275,7 +275,7 @@ std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, s
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL_HASHES_BIN::response resp;
-    epee::serialization::load_t_from_json(resp, m_body);
+	epee::serialization::load_t_from_json(resp, m_body);
 
 	if (resp.status != "OK") {
 		return error_ret_json_from_message("Network request failed");
