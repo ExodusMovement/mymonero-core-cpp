@@ -111,6 +111,7 @@ namespace serial_bridge
 	const char *create_blocks_request(int height, size_t *length);
 	native_response extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
+	std::string get_transaction_pool_hashes_str(const char *buffer, size_t length);
 
 	//
 	// Helper Functions

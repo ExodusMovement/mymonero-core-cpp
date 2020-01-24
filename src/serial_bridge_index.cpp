@@ -271,6 +271,30 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	return ret_json_from_root(root);
 }
 
+std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, size_t length) {
+	std::string m_body(buffer, length);
+
+	cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL_HASHES_BIN::response resp;
+    epee::serialization::load_t_from_json(resp, m_body);
+
+	if (resp.status != "OK") {
+		return error_ret_json_from_message("Network request failed");
+	}
+
+	boost::property_tree::ptree root;
+
+	boost::property_tree::ptree tx_hashes_tree;
+	for (int i = 0; i < resp.tx_hashes.size(); i++) {
+		boost::property_tree::ptree tx_hash_tree;
+		tx_hash_tree.put("", epee::string_tools::pod_to_hex(resp.tx_hashes[i]));
+
+		tx_hashes_tree.push_back(std::make_pair("", tx_hash_tree));
+	}
+	root.add_child("tx_hashes", tx_hashes_tree);
+
+	return ret_json_from_root(root);
+}
+
 crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields) {
 	 for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_pub_key) == fields[n].type()) {
