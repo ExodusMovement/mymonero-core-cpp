@@ -123,7 +123,10 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::response resp;
-	epee::serialization::load_t_from_binary(resp, m_body);
+	if (!epee::serialization::load_t_from_binary(resp, m_body)) {
+		native_resp.error = "Network request failed";
+		return native_resp;
+	}
 
 	auto blocks = resp.blocks;
 
@@ -275,7 +278,9 @@ std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, s
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL_HASHES_BIN::response resp;
-	epee::serialization::load_t_from_json(resp, m_body);
+	if (!epee::serialization::load_t_from_json(resp, m_body)) {
+		return error_ret_json_from_message("Network request failed");
+	}
 
 	if (resp.status != "OK") {
 		return error_ret_json_from_message("Network request failed");
