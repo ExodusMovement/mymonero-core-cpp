@@ -100,11 +100,9 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 		return native_resp;
 	}
 
-	crypto::secret_key sec_spend_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key)) {
-		native_resp.error = "Invalid 'sec_spendKey_string'";
-		return native_resp;
-	}
+	crypto::secret_key sec_spend_key = crypto::null_skey;
+	// No error handling there for ParserWithSendTxs that doesn't need this key.
+	epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key);
 
 	crypto::public_key pub_spend_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
@@ -605,9 +603,11 @@ std::vector<utxo> serial_bridge::extract_utxos_from_tx(bridge_tx tx, crypto::sec
 		utxo.pub = output.pub;
 		utxo.rv = serial_bridge::build_rct(tx.rv, output.index);
 
-		monero_key_image_utils::KeyImageRetVals retVals;
-		monero_key_image_utils::new__key_image(pub_spend_key, sec_spend_key, sec_view_key, tx.pub, output.index, retVals);
-		utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
+		if (sec_spend_key != crypto::null_skey) {
+			monero_key_image_utils::KeyImageRetVals retVals;
+			monero_key_image_utils::new__key_image(pub_spend_key, sec_spend_key, sec_view_key, tx.pub, output.index, retVals);
+			utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
+		}
 
 		utxos.push_back(utxo);
 	}
