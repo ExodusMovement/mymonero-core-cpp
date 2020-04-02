@@ -118,6 +118,7 @@ namespace serial_bridge
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, std::map<std::string, bool> &gki);
+	std::vector<crypto::key_image> get_inputs_with_send_txs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, std::map<std::string, bool> &send_txs);
 	std::vector<output> get_outputs(const cryptonote::transaction &tx);
 	rct::xmr_amount get_fee(const cryptonote::transaction &tx, const bridge_tx &bridge_tx);
 	std::string build_rct(const rct::rctSig &rv, size_t index);

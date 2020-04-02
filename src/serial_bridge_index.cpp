@@ -101,8 +101,10 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 	}
 
 	crypto::secret_key sec_spend_key = crypto::null_skey;
-	// No error handling there for ParserWithSendTxs that doesn't need this key.
-	epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), sec_spend_key);
+	auto secSpendKeyString = json_root.get_optional<string>("sec_spendKey_string");
+	if (secSpendKeyString) {
+		epee::string_tools::hex_to_pod(*secSpendKeyString, sec_spend_key);
+	}
 
 	crypto::public_key pub_spend_key;
 	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), pub_spend_key)) {
@@ -116,12 +118,27 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 	uint64_t oldest = json_root.get<uint64_t>("oldest");
 	uint64_t size = json_root.get<uint64_t>("size");
 
-	std::map<std::string, bool> gki;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &image_desc, json_root.get_child("key_images"))
-	{
-		assert(image_desc.first.empty());
+	auto has_send_txs = false;
 
-		gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
+	std::map<std::string, bool> gki;
+	std::map<std::string, bool> send_txs;
+	auto send_txs_child = json_root.get_child_optional("send_txs");
+	if (send_txs_child) {
+		has_send_txs = true;
+
+		BOOST_FOREACH(boost::property_tree::ptree::value_type &send_tx_desc, *send_txs_child)
+		{
+			assert(send_tx_desc.first.empty());
+
+			send_txs.insert(std::pair<std::string, bool>(send_tx_desc.second.get_value<std::string>(), true));
+		}
+	} else {
+		BOOST_FOREACH(boost::property_tree::ptree::value_type &image_desc, json_root.get_child("key_images"))
+		{
+			assert(image_desc.first.empty());
+
+			gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
+		}
 	}
 
 	std::string m_body(buffer, length);
@@ -175,7 +192,7 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			bridge_tx.rv = tx.rct_signatures;
 			bridge_tx.pub = get_extra_pub_key(fields);
 			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
-			bridge_tx.inputs = get_inputs(tx, bridge_tx, gki);
+			bridge_tx.inputs = has_send_txs ? get_inputs_with_send_txs(tx, bridge_tx, send_txs) : get_inputs(tx, bridge_tx, gki);
 
 			auto nonce = get_extra_nonce(fields);
 			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
@@ -203,7 +220,9 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 				auto &utxo = tx_utxos[k];
 				utxo.global_index = resp.output_indices[i].indices[j + 1].indices[utxo.vout];
 
-				gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
+				if (!has_send_txs) {
+					gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
+				}
 			}
 
 			bridge_tx.utxos = tx_utxos;
@@ -338,6 +357,23 @@ std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::trans
 
 		gki.erase(it);
 
+		inputs.push_back(image);
+	}
+
+	return inputs;
+}
+
+std::vector<crypto::key_image> serial_bridge::get_inputs_with_send_txs(const cryptonote::transaction &tx, const bridge_tx &bridge_tx, std::map<std::string, bool> &send_txs) {
+	std::vector<crypto::key_image> inputs;
+
+	auto it = send_txs.find(bridge_tx.id);
+	if (it == send_txs.end()) return inputs;
+
+	for (size_t i = 0; i < tx.vin.size(); i++) {
+		auto &tx_in = tx.vin[i];
+		if (tx_in.type() != typeid(cryptonote::txin_to_key)) continue;
+
+		auto image = boost::get<cryptonote::txin_to_key>(tx_in).k_image;
 		inputs.push_back(image);
 	}
 
