@@ -237,11 +237,14 @@ native_response serial_bridge::extract_data_from_blocks_response(const char *buf
 			std::ofstream f;
 			f.open(storage_path + std::to_string(pruned_block.block_height) + ".json");
 			f << ret_json_from_root(pruned_block_to_json(pruned_block));
-			f.close();
 
-			latest = std::max(latest, pruned_block.block_height);
-			oldest = std::min(oldest, pruned_block.block_height);
-			size += 1;
+			if (f.good()) {
+				latest = std::max(latest, pruned_block.block_height);
+				oldest = std::min(oldest, pruned_block.block_height);
+				size += 1;
+			}
+
+			f.close();
 		}
 	}
 
