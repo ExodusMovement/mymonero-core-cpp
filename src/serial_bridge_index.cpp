@@ -308,7 +308,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 		txs_by_wallet_account_tree.add_child(pair.first, txs_tree);
 	}
 
-	root.add_child("txs_by_wallet_accounts", txs_by_wallet_account_tree);
+	root.add_child("txs_by_wallet_account", txs_by_wallet_account_tree);
 
 	return ret_json_from_root(root);
 }
