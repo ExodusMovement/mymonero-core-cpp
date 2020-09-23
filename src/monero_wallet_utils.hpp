@@ -78,9 +78,6 @@ namespace monero_wallet_utils
 	const static unsigned long sec_seed_hex_string_length = sizeof(secret_key) * 2;
 	const static unsigned long legacy16B__sec_seed_hex_string_length = sizeof(legacy16B_secret_key) * 2;
 	//
-	bool words_to_bytes(const epee::wipeable_string &words, legacy16B_secret_key &dst, std::string &language_name);
-	bool bytes_to_words(const legacy16B_secret_key& src, epee::wipeable_string &words, const std::string &language_name);
-	//
 	bool are_equal_mnemonics(const string &words_a, const string &words_b);
  	//
 	//
@@ -91,7 +88,6 @@ namespace monero_wallet_utils
 		optional<string> optl__sec_seed_string = none;
 		optional<string> optl__mnemonic_string = none;
 		optional<string> mnemonic_language = none;
-		bool from_legacy16B_lw_seed = false;
 	};
 	bool decoded_seed(
 		const epee::wipeable_string &mnemonic_string,
