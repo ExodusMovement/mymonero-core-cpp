@@ -454,6 +454,7 @@ std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index) {
 				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].mask) +
 				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount).substr(0, 16);
 		case rct::RCTTypeBulletproof2:
+		case rct::RCTTypeCLSAG:
 			return epee::string_tools::pod_to_hex(rv.outPk[index].mask) +
 				epee::string_tools::pod_to_hex(rv.ecdhInfo[index].amount).substr(0, 16);
 		default:
@@ -487,6 +488,8 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		tx.rv.type = rct::RCTTypeBulletproof;
 	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		tx.rv.type = rct::RCTTypeBulletproof2;
+	} else if (rv_type_int == rct::RCTTypeCLSAG) {
+		tx.rv.type = rct::RCTTypeCLSAG;
 	} else {
 		throw std::invalid_argument("Invalid 'tx_desc.rv.type'");
 	}
@@ -495,7 +498,7 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 	{
 		assert(ecdh_info_desc.first.empty()); // array elements have no names
 		auto ecdh_info = rct::ecdhTuple{};
-		if (tx.rv.type == rct::RCTTypeBulletproof2) {
+		if (tx.rv.type == rct::RCTTypeBulletproof2 || tx.rv.type == rct::RCTTypeCLSAG) {
 			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8&)ecdh_info.amount)) {
 				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].amount'");
 			}
@@ -618,9 +621,9 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 		rct::key mask;
 		rct::xmr_amount decoded_amount;
 
-		if (rv.type == rct::RCTTypeNull) {
+		if (rv.type == rct::RCTTypeFull) {
 			decoded_amount = rct::decodeRct(rv, sk, index, mask, hw::get_device("default"));
-		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeFull || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2) {
+		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG) {
 			decoded_amount = rct::decodeRctSimple(rv, sk, index, mask, hw::get_device("default"));
 		}
 
