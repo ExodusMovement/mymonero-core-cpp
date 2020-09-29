@@ -435,7 +435,14 @@ void monero_transfer_utils::create_transaction(
 	uint32_t fake_outputs_count = fixed_mixinsize();
 	bool bulletproof = true;
 	rct::RangeProofType range_proof_type = bulletproof ? rct::RangeProofPaddedBulletproof : rct::RangeProofBorromean;
-	int bp_version = bulletproof ? (use_fork_rules_fn(HF_VERSION_SMALLER_BP, -10) ? 2 : 1) : 0;
+
+	int bp_version = 0
+	if (bulletproof) {
+		if (use_fork_rules_fn(HF_VERSION_CLSAG, -10)) bp_version = 3
+		else if (use_fork_rules_fn(HF_VERSION_SMALLER_BP, -10)) bp_version = 2;
+		else bp_version = 1;
+	}
+
 	const rct::RCTConfig rct_config {
 		range_proof_type,
 		bp_version,
