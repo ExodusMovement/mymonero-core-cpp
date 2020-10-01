@@ -240,6 +240,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			}
 		}
 
+		#ifndef EMSCRIPTEN
 		if (pruned_block.block_height >= oldest && pruned_block.block_height <= latest) continue;
 		if (size <= 100 || arc4random_uniform(100) < storage_rate) {
 			std::ofstream f;
@@ -254,6 +255,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 			f.close();
 		}
+		#endif
 	}
 
 	for (const auto& pair : wallet_accounts_params) {
