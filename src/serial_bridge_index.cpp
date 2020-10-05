@@ -961,12 +961,12 @@ string serial_bridge::estimate_fee(const string &args_string)
 	int n_outputs = stoul(json_root.get<string>("n_outputs"));
 	size_t extra_size = stoul(json_root.get<string>("extra_size"));
 	bool bulletproof = json_root.get<bool>("bulletproof");
-	bool clsag = json_root.get<bool>("clsag");
 	uint64_t base_fee = stoull(json_root.get<string>("base_fee"));
 	uint64_t fee_quantization_mask = stoull(json_root.get<string>("fee_quantization_mask"));
 	uint32_t priority = stoul(json_root.get<string>("priority"));
 	uint8_t fork_version = stoul(json_root.get<string>("fork_version"));
 	use_fork_rules_fn_type use_fork_rules_fn = monero_fork_rules::make_use_fork_rules_fn(fork_version);
+	bool clsag = use_fork_rules_fn(HF_VERSION_CLSAG, -10);
 	uint64_t fee_multiplier = monero_fee_utils::get_fee_multiplier(priority, monero_fee_utils::default_priority(), monero_fee_utils::get_fee_algorithm(use_fork_rules_fn), use_fork_rules_fn);
 	//
 	uint64_t fee = monero_fee_utils::estimate_fee(use_per_byte_fee, use_rct, n_inputs, mixin, n_outputs, extra_size, bulletproof, clsag, base_fee, fee_multiplier, fee_quantization_mask);
