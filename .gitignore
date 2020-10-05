@@ -4,6 +4,7 @@ Debug
 xcode
 cmake-build-debug/
 .idea
+.vscode
 CMakeFiles
 CMakeScripts
 CMakeCache.txt
