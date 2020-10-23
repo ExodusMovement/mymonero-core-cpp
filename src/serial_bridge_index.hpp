@@ -76,6 +76,7 @@ namespace serial_bridge
 		uint64_t block_height;
 		rct::rctSig rv;
 		crypto::public_key pub;
+		std::vector<crypto::public_key> additional_pubs;
 		crypto::hash payment_id = crypto::null_hash;
 		crypto::hash8 payment_id8 = crypto::null_hash8;
 		rct::xmr_amount fee_amount = 0;
@@ -126,6 +127,7 @@ namespace serial_bridge
 	//
 	// Helper Functions
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
+	std::vector<crypto::public_key> get_extra_additional_tx_pub_keys(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &gki);
 	std::vector<crypto::key_image> get_inputs_with_send_txs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &send_txs);

@@ -187,6 +187,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			bridge_tx.block_height = height;
 			bridge_tx.rv = tx.rct_signatures;
 			bridge_tx.pub = get_extra_pub_key(fields);
+			bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
 			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
 			bridge_tx.outputs = get_outputs(tx);
 
@@ -345,7 +346,7 @@ std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, s
 }
 
 crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields) {
-	 for (size_t n = 0; n < fields.size(); ++n) {
+	for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_pub_key) == fields[n].type()) {
 			return boost::get<cryptonote::tx_extra_pub_key>(fields[n]).pub_key;
 		}
@@ -354,8 +355,18 @@ crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote
 	return crypto::public_key{};
 }
 
+std::vector<crypto::public_key> serial_bridge::get_extra_additional_tx_pub_keys(const std::vector<cryptonote::tx_extra_field> &fields) {
+	for (size_t n = 0; n < fields.size(); ++n) {
+		if (typeid(cryptonote::tx_extra_additional_pub_keys) == fields[n].type()) {
+			return boost::get<cryptonote::tx_extra_additional_pub_keys>(fields[n]).data;
+		}
+	}
+
+	return {};
+}
+
 std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields) {
-	 for (size_t n = 0; n < fields.size(); ++n) {
+	for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_nonce) == fields[n].type()) {
 			return boost::get<cryptonote::tx_extra_nonce>(fields[n]).nonce;
 		}
@@ -639,6 +650,23 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 }
 std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key)
 {
+	hw::device &hwdev = hw::get_device("default");
+
+	cryptonote::account_keys account_keys;
+	account_keys.m_spend_secret_key = sec_spend_key;
+	account_keys.m_view_secret_key = sec_view_key;
+	account_keys.m_account_address.m_spend_public_key = pub_spend_key;
+
+	unsigned int count = 200;
+	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
+	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, 0, 0, count);
+
+	cryptonote::subaddress_index index = {0, 0};
+	for (index.minor = 0; index.minor < count; index.minor++) {
+		const crypto::public_key &D = pkeys[index.minor];
+		subaddresses[D] = index;
+	}
+
 	std::vector<Utxo> utxos;
 
 	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
@@ -646,14 +674,22 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		return utxos;
 	}
 
-	BOOST_FOREACH(auto &output, tx.outputs)
-	{
-		crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
-		if (!crypto::derive_public_key(derivation, output.index, pub_spend_key, derived_key)) {
-			continue;
+	std::vector<crypto::key_derivation> additional_derivations;
+	for (const auto& pub : tx.additional_pubs) {
+		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
+
+		if (!crypto::generate_key_derivation(pub, sec_view_key, derivation)) {
+			return utxos;
 		}
 
-		if (!serial_bridge::keys_equal(output.pub, derived_key)) continue;
+		additional_derivations.push_back(additional_derivation);
+	}
+
+
+	BOOST_FOREACH(auto &output, tx.outputs)
+	{
+		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev);
+		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
 		utxo.tx_id = tx.id;
