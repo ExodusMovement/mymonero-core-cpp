@@ -37,6 +37,7 @@
 #include <boost/property_tree/ptree.hpp>
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "cryptonote_config.h"
+#include "cryptonote_basic/account.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
@@ -98,9 +99,7 @@ namespace serial_bridge
 	};
 
 	struct WalletAccountParams {
-		crypto::secret_key sec_view_key;
-		crypto::secret_key sec_spend_key = crypto::null_skey;
-		crypto::public_key pub_spend_key;
+		cryptonote::account_keys account_keys;
 		bool has_send_txs = false;
 		std::map<std::string, bool> gki;
 		std::map<std::string, bool> send_txs;
@@ -139,7 +138,7 @@ namespace serial_bridge
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
-	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
+	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys);
 
 	//
 	// Bridging Functions - these take and return JSON strings
