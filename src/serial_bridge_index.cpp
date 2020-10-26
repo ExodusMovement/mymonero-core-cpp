@@ -615,10 +615,6 @@ boost::property_tree::ptree serial_bridge::pruned_block_to_json(const PrunedBloc
 	return block_tree;
 }
 
-bool serial_bridge::keys_equal(crypto::public_key a, crypto::public_key b)
-{
-	return equal(a.data, a.data + 32, b.data);
-}
 string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index)
 {
 	if (version == 1) {

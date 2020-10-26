@@ -138,7 +138,6 @@ namespace serial_bridge
 	boost::property_tree::ptree inputs_to_json(std::vector<crypto::key_image> inputs);
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
-	bool keys_equal(crypto::public_key a, crypto::public_key b);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, crypto::secret_key sec_view_key, crypto::secret_key sec_spend_key, crypto::public_key pub_spend_key);
 
