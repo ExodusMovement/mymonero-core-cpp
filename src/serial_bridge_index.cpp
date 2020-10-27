@@ -135,6 +135,9 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			}
 		}
 
+		cryptonote::subaddress_index index = {0, 0};
+		expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index);
+
 		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
 
@@ -218,7 +221,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 					get_inputs_with_send_txs(tx, bridge_tx_copy, wallet_account_params.send_txs) :
 					get_inputs(tx, bridge_tx_copy, wallet_account_params.gki);
 
-				auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys);
+				auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys, wallet_account_params.subaddresses);
 
 				for (size_t k = 0; k < tx_utxos.size(); k++) {
 					auto &utxo = tx_utxos[k];
@@ -640,19 +643,9 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 
 	return "";
 }
-std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys)
+std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
 {
 	hw::device &hwdev = hw::get_device("default");
-
-	unsigned int count = 200;
-	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
-	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, 0, 0, count);
-
-	cryptonote::subaddress_index index = {0, 0};
-	for (index.minor = 0; index.minor < count; index.minor++) {
-		const crypto::public_key &D = pkeys[index.minor];
-		subaddresses[D] = index;
-	}
 
 	std::vector<Utxo> utxos;
 
@@ -699,10 +692,37 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 			utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
 		}
 
+		expand_subaddresses(account_keys, subaddresses, (*subaddr_recv_info).index);
+
 		utxos.push_back(utxo);
 	}
 
 	return utxos;
+}
+
+void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& tx_index, uint32_t lookahead) {
+	if (subaddresses.size() > (tx_index.minor + lookahead - 1)) return;
+
+	hw::device &hwdev = hw::get_device("default");
+
+	const uint32_t begin = subaddresses.size();
+	const uint32_t end = get_subaddress_clamped_sum(tx_index.minor, lookahead);
+
+	cryptonote::subaddress_index index = {0, begin};
+
+	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, index.major, index.minor, end);
+	for (; index.minor < end; index.minor++) {
+		const crypto::public_key &D = pkeys[index.minor];
+		subaddresses[D] = index;
+	}
+}
+
+uint32_t serial_bridge::get_subaddress_clamped_sum(uint32_t idx, uint32_t extra)
+{
+  static constexpr uint32_t uint32_max = std::numeric_limits<uint32_t>::max();
+  if (idx > uint32_max - extra)
+    return uint32_max;
+  return idx + extra;
 }
 //
 //
@@ -1559,6 +1579,10 @@ string serial_bridge::extract_utxos(const string &args_string)
 		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
 	}
 
+	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
+	cryptonote::subaddress_index index = {0, 0};
+	expand_subaddresses(account_keys, subaddresses, index);
+
 	std::vector<Utxo> utxos;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
 	{
@@ -1566,7 +1590,7 @@ string serial_bridge::extract_utxos(const string &args_string)
 
 		try {
 			auto tx = serial_bridge::json_to_tx(tx_desc.second);
-			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, account_keys);
+			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, account_keys, subaddresses);
 			utxos.insert(std::end(utxos), std::begin(tx_utxos), std::end(tx_utxos));
 		} catch(std::invalid_argument err) {
 			return error_ret_json_from_message(err.what());

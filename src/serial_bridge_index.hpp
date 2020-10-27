@@ -41,6 +41,9 @@
 #include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
+
+#define SUBADDRESS_LOOKAHEAD_MINOR 200
+
 //
 // See serial_bridge_utils.hpp
 //
@@ -100,6 +103,7 @@ namespace serial_bridge
 
 	struct WalletAccountParams {
 		cryptonote::account_keys account_keys;
+		std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
 		bool has_send_txs = false;
 		std::map<std::string, bool> gki;
 		std::map<std::string, bool> send_txs;
@@ -138,7 +142,10 @@ namespace serial_bridge
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
-	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys);
+	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
+
+	void expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& index, uint32_t lookahead = SUBADDRESS_LOOKAHEAD_MINOR);
+	uint32_t get_subaddress_clamped_sum(uint32_t idx, uint32_t extra);
 
 	//
 	// Bridging Functions - these take and return JSON strings
