@@ -576,6 +576,8 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos
 		out_ptree.put("vout", utxo.vout);
 		out_ptree.put("amount", utxo.amount);
 		out_ptree.put("key_image", utxo.key_image);
+		out_ptree.put("index_major", utxo.index.major);
+		out_ptree.put("index_minor", utxo.index.minor);
 
 		if (native) {
 			out_ptree.put("pub", epee::string_tools::pod_to_hex(utxo.pub));
@@ -673,6 +675,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 
 		Utxo utxo;
 		utxo.tx_id = tx.id;
+		utxo.index = (*subaddr_recv_info).index;
 		utxo.vout = output.index;
 		utxo.amount = serial_bridge::decode_amount(tx.version, derivation, tx.rv, output.amount, output.index);
 		utxo.tx_pub = tx.pub;

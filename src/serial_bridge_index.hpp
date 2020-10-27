@@ -38,6 +38,7 @@
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "cryptonote_config.h"
 #include "cryptonote_basic/account.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "cryptonote_basic/tx_extra.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
@@ -60,6 +61,7 @@ namespace serial_bridge
 
 	struct UtxoBase {
 		string tx_id;
+		cryptonote::subaddress_index index;
 		uint8_t vout;
 		string amount;
 		string key_image;
