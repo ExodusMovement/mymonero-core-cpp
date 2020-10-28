@@ -135,8 +135,10 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			}
 		}
 
+		uint32_t subaddresses_count = params_desc.second.get<uint32_t>("subaddresses");
+
 		cryptonote::subaddress_index index = {0, 0};
-		expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index);
+		expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index, subaddresses_count);
 
 		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
@@ -259,7 +261,11 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	}
 
 	for (const auto& pair : wallet_accounts_params) {
-		native_resp.txs_by_wallet_account.insert(std::make_pair(pair.first, pair.second.txs));
+		Result result;
+		result.subaddresses = pair.second.subaddresses.size();
+		result.txs = pair.second.txs;
+
+		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, result));
 	}
 
 	native_resp.current_height = resp.current_height;
@@ -286,10 +292,10 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	root.put("oldest", resp.oldest);
 	root.put("size", resp.size);
 
-	boost::property_tree::ptree txs_by_wallet_account_tree;
-	for (const auto& pair : resp.txs_by_wallet_account) {
+	boost::property_tree::ptree results_tree;
+	for (const auto& pair : resp.results_by_wallet_account) {
 		boost::property_tree::ptree txs_tree;
-		for (const auto& tx : pair.second) {
+		for (const auto& tx : pair.second.txs) {
 			boost::property_tree::ptree tx_tree;
 
 			tx_tree.put("id", tx.id);
@@ -310,10 +316,14 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 			txs_tree.push_back(std::make_pair("", tx_tree));
 		}
 
-		txs_by_wallet_account_tree.add_child(pair.first, txs_tree);
+		boost::property_tree::ptree wallet_tree;
+		wallet_tree.add_child("txs", txs_tree);
+		wallet_tree.put("subaddresses", pair.second.subaddresses);
+
+		results_tree.add_child(pair.first, wallet_tree);
 	}
 
-	root.add_child("txs_by_wallet_account", txs_by_wallet_account_tree);
+	root.add_child("results", results_tree);
 
 	return ret_json_from_root(root);
 }
@@ -1582,9 +1592,11 @@ string serial_bridge::extract_utxos(const string &args_string)
 		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
 	}
 
+	uint32_t subaddresses_count = json_root.get<uint32_t>("subaddresses");
+
 	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
 	cryptonote::subaddress_index index = {0, 0};
-	expand_subaddresses(account_keys, subaddresses, index);
+	expand_subaddresses(account_keys, subaddresses, index, subaddresses_count);
 
 	std::vector<Utxo> utxos;
 	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
@@ -1602,5 +1614,6 @@ string serial_bridge::extract_utxos(const string &args_string)
 
 	boost::property_tree::ptree root;
 	root.add_child("outputs", serial_bridge::utxos_to_json(utxos));
+	root.put("subaddresses", subaddresses.size());
 	return ret_json_from_root(root);
 }

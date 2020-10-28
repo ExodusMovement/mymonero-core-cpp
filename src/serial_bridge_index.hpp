@@ -112,11 +112,16 @@ namespace serial_bridge
 		std::vector<BridgeTransaction> txs;
 	};
 
+	struct Result {
+		uint32_t subaddresses;
+		std::vector<BridgeTransaction> txs;
+	};
+
 	struct NativeResponse {
 		std::string error;
 		uint64_t current_height;
 		uint64_t end_height = 0;
-		std::map<std::string, std::vector<BridgeTransaction>> txs_by_wallet_account;
+		std::map<std::string, Result> results_by_wallet_account;
 		uint64_t latest;
 		uint64_t oldest;
 		uint64_t size;
