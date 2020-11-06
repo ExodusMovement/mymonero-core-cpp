@@ -36,6 +36,7 @@
 #include "string_tools.h"
 #include "monero_paymentID_utils.hpp"
 #include "monero_key_image_utils.hpp"
+#include "serial_bridge_index.hpp"
 //
 using namespace std;
 using namespace crypto;
@@ -745,10 +746,12 @@ void monero_transfer_utils::convenience__create_transaction(
 		}
 		payment_id_seen = true;
 	}
-	//
-	uint32_t subaddr_account_idx = 0;
+	uint32_t subaddr_account_idx = 0; // unused
+
 	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
-	subaddresses[account_keys.m_account_address.m_spend_public_key] = {0,0};
+	cryptonote::subaddress_index index = {0, 0};
+	serial_bridge::expand_subaddresses(account_keys, subaddresses, index, 200);
+
 	//
 	TransactionConstruction_RetVals actualCall_retVals;
 	create_transaction(
