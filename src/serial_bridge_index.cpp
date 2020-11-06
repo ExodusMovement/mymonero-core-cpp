@@ -685,7 +685,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 
 		Utxo utxo;
 		utxo.tx_id = tx.id;
-		utxo.index = (*subaddr_recv_info).index;
+		utxo.index = subaddr_recv_info->index;
 		utxo.vout = output.index;
 		utxo.amount = serial_bridge::decode_amount(tx.version, derivation, tx.rv, output.amount, output.index);
 		utxo.tx_pub = tx.pub;
@@ -693,16 +693,14 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		utxo.rv = serial_bridge::build_rct(tx.rv, output.index);
 
 		if (account_keys.m_spend_secret_key != crypto::null_skey) {
-			monero_key_image_utils::KeyImageRetVals retVals;
-			monero_key_image_utils::new__key_image(
-				account_keys.m_account_address.m_spend_public_key,
-				account_keys.m_spend_secret_key,
-				account_keys.m_view_secret_key,
-				tx.pub,
-				output.index,
-				retVals
-			);
-			utxo.key_image = epee::string_tools::pod_to_hex(retVals.calculated_key_image);
+			cryptonote::keypair in_ephemeral;
+			crypto::key_image ki;
+
+			if(!generate_key_image_helper_precomp(account_keys, output.pub, subaddr_recv_info->derivation, output.index, subaddr_recv_info->index, in_ephemeral, ki, hwdev)) {
+				continue;
+			}
+
+			utxo.key_image = epee::string_tools::pod_to_hex(ki);
 		}
 
 		expand_subaddresses(account_keys, subaddresses, (*subaddr_recv_info).index);
