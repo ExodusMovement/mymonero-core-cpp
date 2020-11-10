@@ -389,6 +389,7 @@ void _reenterable_construct_and_send_tx(
 			args.fee_per_b,
 			args.fee_quantization_mask,
 			*(parsed_res.mix_outs),
+			200,
 			std::move(use_fork_rules),
 			args.unlock_time,
 			args.nettype

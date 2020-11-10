@@ -229,6 +229,7 @@ namespace monero_transfer_utils
 		uint64_t fee_per_b, // per v8
 		uint64_t fee_quantization_mask,
 		vector<RandomAmountOutputs> &mix_outs, // it gets sorted
+		uint32_t subaddresses_count,
 		use_fork_rules_fn_type use_fork_rules_fn,
 		uint64_t unlock_time, // or 0
 		cryptonote::network_type nettype
@@ -260,6 +261,7 @@ namespace monero_transfer_utils
 		uint64_t fee_amount,
 		const vector<SpendableOutput> &outputs,
 		vector<RandomAmountOutputs> &mix_outs, // get sorted
+		uint32_t subaddresses_count,
 		use_fork_rules_fn_type use_fork_rules_fn,
 		uint64_t unlock_time							= 0, // or 0
 		network_type nettype 							= MAINNET
