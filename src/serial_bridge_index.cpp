@@ -723,7 +723,7 @@ void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, s
 
 	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, index.major, index.minor, end);
 	for (; index.minor < end; index.minor++) {
-		const crypto::public_key &D = pkeys[index.minor];
+		const crypto::public_key &D = pkeys[index.minor - begin];
 		subaddresses[D] = index;
 	}
 }
