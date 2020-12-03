@@ -1583,7 +1583,9 @@ string serial_bridge::extract_utxos(const string &args_string)
 		return error_ret_json_from_message("Invalid 'sec_viewKey_string'");
 	}
 
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_spendKey_string"), account_keys.m_spend_secret_key)) {
+	account_keys.m_spend_secret_key = crypto::null_skey;
+	auto secSpendKeyString = json_root.get_optional<string>("sec_spendKey_string");
+	if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, account_keys.m_spend_secret_key)) {
 		return error_ret_json_from_message("Invalid 'sec_spendKey_string'");
 	}
 
