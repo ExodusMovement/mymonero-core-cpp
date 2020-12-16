@@ -670,7 +670,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	for (const auto& pub : tx.additional_pubs) {
 		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
 
-		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, derivation)) {
+		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, additional_derivation)) {
 			return utxos;
 		}
 
