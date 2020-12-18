@@ -103,9 +103,12 @@ namespace serial_bridge
 		std::vector<Mixin> mixins;
 	};
 
-	struct WalletAccountParams {
+	struct WalletAccountParamsBase {
 		cryptonote::account_keys account_keys;
 		std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
+	};
+
+	struct WalletAccountParams : WalletAccountParamsBase {
 		bool has_send_txs = false;
 		std::map<std::string, bool> gki;
 		std::map<std::string, bool> send_txs;
