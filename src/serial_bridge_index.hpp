@@ -114,16 +114,23 @@ namespace serial_bridge
 		std::map<std::string, bool> send_txs;
 	};
 
-	struct Result {
+	struct ResultBase {
 		uint32_t subaddresses;
+	};
+
+	struct ExtractTransactionsResult : ResultBase {
 		std::vector<BridgeTransaction> txs;
+	};
+
+	struct ExtractUtxosResult : ResultBase {
+		std::vector<Utxo> utxos;
 	};
 
 	struct NativeResponse {
 		std::string error;
 		uint64_t current_height;
 		uint64_t end_height = 0;
-		std::map<std::string, Result> results_by_wallet_account;
+		std::map<std::string, ExtractTransactionsResult> results_by_wallet_account;
 		uint64_t latest;
 		uint64_t oldest;
 		uint64_t size;
@@ -131,8 +138,7 @@ namespace serial_bridge
 
 	struct ExtractUtxosResponse {
 		std::string error;
-		uint32_t subaddresses;
-		std::vector<Utxo> utxos;
+		std::map<std::string, ExtractUtxosResult> results_by_wallet_account;
 	};
 
 	//

@@ -144,7 +144,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	}
 
 	for (const auto& pair : wallet_accounts_params) {
-		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, Result {}));
+		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult {}));
 	}
 
 	std::string m_body(buffer, length);
@@ -720,53 +720,63 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
-		// it will already have thrown an exception
 		response.error = error_ret_json_from_message("Invalid JSON");
 		return response;
 	}
 
-	cryptonote::account_keys account_keys;
+	std::map<std::string, WalletAccountParamsBase> wallet_accounts_params;
+	for (const auto& params_desc : json_root.get_child("params_by_wallet_account")) {
+		WalletAccountParamsBase wallet_account_params;
 
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), account_keys.m_view_secret_key)) {
-		response.error = error_ret_json_from_message("Invalid 'sec_viewKey_string'");
-		return response;
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
+			continue;
+		}
+
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key)) {
+			continue;
+		}
+
+		wallet_account_params.account_keys.m_spend_secret_key = crypto::null_skey;
+		auto secSpendKeyString = params_desc.second.get_optional<string>("sec_spendKey_string");
+		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key)) {
+			continue;
+		}
+
+		uint32_t subaddresses_count = params_desc.second.get<uint32_t>("subaddresses");
+
+		cryptonote::subaddress_index index = {0, 0};
+		expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index, subaddresses_count);
+
+		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
 
-	account_keys.m_spend_secret_key = crypto::null_skey;
-	auto secSpendKeyString = json_root.get_optional<string>("sec_spendKey_string");
-	if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, account_keys.m_spend_secret_key)) {
-		response.error = error_ret_json_from_message("Invalid 'sec_spendKey_string'");
-		return response;
+	for (const auto& pair : wallet_accounts_params) {
+		response.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractUtxosResult {}));
 	}
 
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), account_keys.m_account_address.m_spend_public_key)) {
-		response.error = error_ret_json_from_message("Invalid 'pub_spendKey_string'");
-		return response;
-	}
-
-	uint32_t subaddresses_count = json_root.get<uint32_t>("subaddresses");
-
-	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
-	cryptonote::subaddress_index index = {0, 0};
-	expand_subaddresses(account_keys, subaddresses, index, subaddresses_count);
-
-	std::vector<Utxo> utxos;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
-	{
+	for (const auto& tx_desc : json_root.get_child("txs")) {
 		assert(tx_desc.first.empty());
 
+		BridgeTransaction tx;
 		try {
-			auto tx = serial_bridge::json_to_tx(tx_desc.second);
-			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, account_keys, subaddresses);
-			utxos.insert(std::end(utxos), std::begin(tx_utxos), std::end(tx_utxos));
+			tx = serial_bridge::json_to_tx(tx_desc.second);
 		} catch(std::invalid_argument err) {
-			response.error = error_ret_json_from_message(err.what());
-			return response;
+			continue;
+		}
+
+		for (auto& pair : wallet_accounts_params) {
+			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, pair.second.account_keys, pair.second.subaddresses);
+
+			auto &result = response.results_by_wallet_account[pair.first];
+			result.utxos.insert(std::end(result.utxos), std::begin(tx_utxos), std::end(tx_utxos));
 		}
 	}
 
-	response.subaddresses = subaddresses.size();
-	response.utxos = utxos;
+
+	for (const auto& pair : wallet_accounts_params) {
+		auto &result = response.results_by_wallet_account[pair.first];
+		result.subaddresses = pair.second.subaddresses.size();
+	}
 
 	return response;
 }
@@ -1637,7 +1647,15 @@ string serial_bridge::extract_utxos(const string &args_string)
 	if (!response.error.empty()) return response.error;
 
 	boost::property_tree::ptree root;
-	root.add_child("outputs", serial_bridge::utxos_to_json(response.utxos));
-	root.put("subaddresses", response.subaddresses);
+	boost::property_tree::ptree results_tree;
+	for (const auto& pair : response.results_by_wallet_account) {
+		boost::property_tree::ptree wallet_tree;
+		wallet_tree.add_child("outputs", serial_bridge::utxos_to_json(pair.second.utxos));
+		wallet_tree.put("subaddresses", pair.second.subaddresses);
+
+		results_tree.add_child(pair.first, wallet_tree);
+	}
+	root.add_child("results", results_tree);
+
 	return ret_json_from_root(root);
 }
