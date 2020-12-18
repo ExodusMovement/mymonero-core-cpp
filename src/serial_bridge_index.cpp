@@ -143,6 +143,10 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
 
+	for (const auto& pair : wallet_accounts_params) {
+		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, Result {}));
+	}
+
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::response resp;
@@ -237,7 +241,8 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 				bridge_tx_copy.utxos = tx_utxos;
 
 				if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0) {
-					wallet_account_params.txs.push_back(bridge_tx_copy);
+					auto &result = native_resp.results_by_wallet_account[pair.first];
+					result.txs.push_back(bridge_tx_copy);
 				}
 			}
 		}
@@ -261,11 +266,9 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	}
 
 	for (const auto& pair : wallet_accounts_params) {
-		Result result;
-		result.subaddresses = pair.second.subaddresses.size();
-		result.txs = pair.second.txs;
+		auto &result = native_resp.results_by_wallet_account[pair.first];
 
-		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, result));
+		result.subaddresses = pair.second.subaddresses.size();
 	}
 
 	native_resp.current_height = resp.current_height;

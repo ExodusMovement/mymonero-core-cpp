@@ -109,7 +109,6 @@ namespace serial_bridge
 		bool has_send_txs = false;
 		std::map<std::string, bool> gki;
 		std::map<std::string, bool> send_txs;
-		std::vector<BridgeTransaction> txs;
 	};
 
 	struct Result {
