@@ -127,6 +127,12 @@ namespace serial_bridge
 		uint64_t size;
 	};
 
+	struct ExtractUtxosResponse {
+		std::string error;
+		uint32_t subaddresses;
+		std::vector<Utxo> utxos;
+	};
+
 	//
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
@@ -150,6 +156,8 @@ namespace serial_bridge
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index);
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
+
+	ExtractUtxosResponse extract_utxos_raw(const string &args_string);
 
 	void expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& index, uint32_t lookahead = SUBADDRESS_LOOKAHEAD_MINOR);
 	uint32_t get_subaddress_clamped_sum(uint32_t idx, uint32_t extra);

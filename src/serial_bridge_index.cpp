@@ -711,6 +711,64 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	return utxos;
 }
 
+ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
+{
+	ExtractUtxosResponse response;
+
+	boost::property_tree::ptree json_root;
+	if (!parsed_json_root(args_string, json_root)) {
+		// it will already have thrown an exception
+		response.error = error_ret_json_from_message("Invalid JSON");
+		return response;
+	}
+
+	cryptonote::account_keys account_keys;
+
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), account_keys.m_view_secret_key)) {
+		response.error = error_ret_json_from_message("Invalid 'sec_viewKey_string'");
+		return response;
+	}
+
+	account_keys.m_spend_secret_key = crypto::null_skey;
+	auto secSpendKeyString = json_root.get_optional<string>("sec_spendKey_string");
+	if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, account_keys.m_spend_secret_key)) {
+		response.error = error_ret_json_from_message("Invalid 'sec_spendKey_string'");
+		return response;
+	}
+
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), account_keys.m_account_address.m_spend_public_key)) {
+		response.error = error_ret_json_from_message("Invalid 'pub_spendKey_string'");
+		return response;
+	}
+
+	uint32_t subaddresses_count = json_root.get<uint32_t>("subaddresses");
+
+	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
+	cryptonote::subaddress_index index = {0, 0};
+	expand_subaddresses(account_keys, subaddresses, index, subaddresses_count);
+
+	std::vector<Utxo> utxos;
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
+	{
+		assert(tx_desc.first.empty());
+
+		try {
+			auto tx = serial_bridge::json_to_tx(tx_desc.second);
+			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, account_keys, subaddresses);
+			utxos.insert(std::end(utxos), std::begin(tx_utxos), std::end(tx_utxos));
+		} catch(std::invalid_argument err) {
+			response.error = error_ret_json_from_message(err.what());
+			return response;
+		}
+	}
+
+	response.subaddresses = subaddresses.size();
+	response.utxos = utxos;
+
+	return response;
+}
+
+
 void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& tx_index, uint32_t lookahead) {
 	if (subaddresses.size() > (tx_index.minor + lookahead - 1)) return;
 
@@ -1571,50 +1629,12 @@ string serial_bridge::encrypt_payment_id(const string &args_string)
 }
 string serial_bridge::extract_utxos(const string &args_string)
 {
-	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root)) {
-		// it will already have thrown an exception
-		return error_ret_json_from_message("Invalid JSON");
-	}
+	auto response = serial_bridge::extract_utxos_raw(args_string);
 
-	cryptonote::account_keys account_keys;
-
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec_viewKey_string"), account_keys.m_view_secret_key)) {
-		return error_ret_json_from_message("Invalid 'sec_viewKey_string'");
-	}
-
-	account_keys.m_spend_secret_key = crypto::null_skey;
-	auto secSpendKeyString = json_root.get_optional<string>("sec_spendKey_string");
-	if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, account_keys.m_spend_secret_key)) {
-		return error_ret_json_from_message("Invalid 'sec_spendKey_string'");
-	}
-
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub_spendKey_string"), account_keys.m_account_address.m_spend_public_key)) {
-		return error_ret_json_from_message("Invalid 'pub_spendKey_string'");
-	}
-
-	uint32_t subaddresses_count = json_root.get<uint32_t>("subaddresses");
-
-	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
-	cryptonote::subaddress_index index = {0, 0};
-	expand_subaddresses(account_keys, subaddresses, index, subaddresses_count);
-
-	std::vector<Utxo> utxos;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &tx_desc, json_root.get_child("txs"))
-	{
-		assert(tx_desc.first.empty());
-
-		try {
-			auto tx = serial_bridge::json_to_tx(tx_desc.second);
-			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, account_keys, subaddresses);
-			utxos.insert(std::end(utxos), std::begin(tx_utxos), std::end(tx_utxos));
-		} catch(std::invalid_argument err) {
-			return error_ret_json_from_message(err.what());
-		}
-	}
+	if (!response.error.empty()) return response.error;
 
 	boost::property_tree::ptree root;
-	root.add_child("outputs", serial_bridge::utxos_to_json(utxos));
-	root.put("subaddresses", subaddresses.size());
+	root.add_child("outputs", serial_bridge::utxos_to_json(response.utxos));
+	root.put("subaddresses", response.subaddresses);
 	return ret_json_from_root(root);
 }
