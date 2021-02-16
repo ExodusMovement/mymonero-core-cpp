@@ -686,7 +686,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		utxo.tx_id = tx.id;
 		utxo.index = subaddr_recv_info->index;
 		utxo.vout = output.index;
-		utxo.amount = serial_bridge::decode_amount(tx.version, derivation, tx.rv, output.amount, output.index);
+		utxo.amount = serial_bridge::decode_amount(tx.version, subaddr_recv_info->derivation, tx.rv, output.amount, output.index);
 		utxo.tx_pub = tx.pub;
 		utxo.pub = output.pub;
 		utxo.rv = serial_bridge::build_rct(tx.rv, output.index);
