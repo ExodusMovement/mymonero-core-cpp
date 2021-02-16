@@ -634,20 +634,16 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 	if (version == 1) {
 		return amount;
 	} else if (version == 2) {
-		rct::key sk;
-		crypto::ec_scalar scalar = AUTO_VAL_INIT(scalar);
-		crypto::derivation_to_scalar(derivation, index, scalar);
-
-		string sk_str = epee::string_tools::pod_to_hex(scalar);
-		epee::string_tools::hex_to_pod(sk_str, sk);
+		crypto::secret_key scalar;
+		hw::get_device("default").derivation_to_scalar(derivation, index, scalar);
 
 		rct::key mask;
 		rct::xmr_amount decoded_amount;
 
 		if (rv.type == rct::RCTTypeFull) {
-			decoded_amount = rct::decodeRct(rv, sk, index, mask, hw::get_device("default"));
-		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG) {
-			decoded_amount = rct::decodeRctSimple(rv, sk, index, mask, hw::get_device("default"));
+			decoded_amount = rct::decodeRct(rv, rct::sk2rct(scalar), index, mask, hw::get_device("default"));
+		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG) {
+			decoded_amount = rct::decodeRctSimple(rv, rct::sk2rct(scalar), index, mask, hw::get_device("default"));
 		}
 
 		ostringstream decoded_amount_ss;
