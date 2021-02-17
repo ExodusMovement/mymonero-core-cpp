@@ -497,6 +497,19 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		throw std::invalid_argument("Invalid 'tx_desc.pub'");
 	}
 
+	for (const auto& additional_pub_desc : tx_desc.get_child("additional_pubs")) {
+		assert(additional_pub_desc.first.empty());
+
+		std::string pub_str = additional_pub_desc.second.get_value<std::string>();
+
+		crypto::public_key pub;
+		if (!epee::string_tools::hex_to_pod(pub_str, pub)) {
+			throw std::invalid_argument("Invalid 'tx_desc.additional_pubs.pub'");
+		}
+
+		tx.additional_pubs.push_back(pub);
+	}
+
 	tx.version = stoul(tx_desc.get<string>("version"));
 
 	auto rv_desc = tx_desc.get_child("rv");
