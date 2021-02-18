@@ -1299,15 +1299,12 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 	return ret_json_from_root(root);
 }
 
-CreateTxResponse serial_bridge::send_step2__try_create_transaction_raw(const string &args_string)
+string serial_bridge::send_step2__try_create_transaction(const string &args_string)
 {
-	CreateTxResponse response;
-
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
-		response.error = error_ret_json_from_message("Invalid JSON");
-		return response;
+		return error_ret_json_from_message("Invalid JSON");
 	}
 	//
 	vector<SpendableOutput> using_outs;
@@ -1356,9 +1353,9 @@ CreateTxResponse serial_bridge::send_step2__try_create_transaction_raw(const str
 	if (optl__fork_version_string != none) {
 		fork_version = stoul(*optl__fork_version_string);
 	}
-
+	Send_Step2_RetVals retVals;
 	monero_transfer_utils::send_step2__try_create_transaction(
-		response.retVals,
+		retVals,
 		//
 		json_root.get<string>("from_address_string"),
 		json_root.get<string>("sec_viewKey_string"),
@@ -1379,16 +1376,6 @@ CreateTxResponse serial_bridge::send_step2__try_create_transaction_raw(const str
 		nettype_from_string(json_root.get<string>("nettype_string"))
 	);
 
-	return response;
-}
-
-string serial_bridge::send_step2__try_create_transaction(const string &args_string)
-{
-	auto response = serial_bridge::send_step2__try_create_transaction_raw(args_string);
-
-	if (!response.error.empty()) return response.error;
-
-	auto retVals = response.retVals;
 	boost::property_tree::ptree root;
 	if (retVals.errCode != noError) {
 		root.put(ret_json_key__any__err_code(), retVals.errCode);

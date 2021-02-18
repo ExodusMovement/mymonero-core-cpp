@@ -43,8 +43,6 @@
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
-#include "monero_transfer_utils.hpp"
-
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
 
 //
@@ -143,11 +141,6 @@ namespace serial_bridge
 		std::map<std::string, ExtractUtxosResult> results_by_wallet_account;
 	};
 
-	struct CreateTxResponse {
-		std::string error;
-		monero_transfer_utils::Send_Step2_RetVals retVals;
-	};
-
 	//
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
@@ -173,7 +166,6 @@ namespace serial_bridge
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
 
 	ExtractUtxosResponse extract_utxos_raw(const string &args_string);
-	CreateTxResponse send_step2__try_create_transaction_raw(const string &args_string);
 
 	void expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& index, uint32_t lookahead = SUBADDRESS_LOOKAHEAD_MINOR);
 	uint32_t get_subaddress_clamped_sum(uint32_t idx, uint32_t extra);
