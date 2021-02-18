@@ -305,6 +305,16 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 			tx_tree.put("timestamp", tx.timestamp);
 			tx_tree.put("height", tx.block_height);
 			tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
+
+			boost::property_tree::ptree additional_pubs_tree;
+			for (const auto& pub : tx.additional_pubs) {
+				boost::property_tree::ptree value;
+				value.put("", epee::string_tools::pod_to_hex(pub));
+
+				additional_pubs_tree.push_back(std::make_pair("", value));
+			}
+			tx_tree.add_child("additional_pubs", additional_pubs_tree);
+
 			tx_tree.put("fee", tx.fee_amount);
 
 			if (tx.payment_id8 != crypto::null_hash8) {
