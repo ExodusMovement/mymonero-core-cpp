@@ -65,6 +65,7 @@ namespace monero_transfer_utils
 		uint64_t global_index;
 		uint64_t index;
 		string tx_pub_key;
+		std::vector<string> additional_tx_pubs;
 	};
 	struct RandomAmountOutput
 	{

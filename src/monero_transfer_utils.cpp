@@ -572,6 +572,17 @@ void monero_transfer_utils::create_transaction(
 		src.real_out_tx_key = tx_pub_key;
 		//
 		src.real_out_additional_tx_keys = get_additional_tx_pub_keys_from_extra(extra);
+
+		for (const auto& additional_pub_str : outputs[out_index].additional_tx_pubs) {
+			crypto::public_key additional_pub;
+			if (!epee::string_tools::hex_to_pod(additional_pub_str, additional_pub)) {
+				retVals.errCode = givenAnInvalidPubKey;
+				return;
+			}
+
+			src.real_out_additional_tx_keys.push_back(additional_pub);
+		}
+
 		//
 		src.real_output = real_output_index;
 		uint64_t internal_output_index = outputs[out_index].index;
