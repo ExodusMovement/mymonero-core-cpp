@@ -142,7 +142,7 @@ bool _rct_hex_to_decrypted_mask(
 	sc_sub(decrypted_mask.bytes,
 		encrypted_mask.bytes,
 		rct::hash_to_scalar(make_key_derivation()).bytes);
-	
+
 	return true;
 }
 bool _verify_sec_key(const crypto::secret_key &secret_key, const crypto::public_key &public_key)
@@ -166,7 +166,7 @@ namespace
 			vec[idx] = std::move(vec.back());
 		}
 		vec.resize(vec.size() - 1);
-		
+
 		return res;
 	}
 	//
@@ -174,7 +174,7 @@ namespace
 	T pop_random_value(std::vector<T>& vec)
 	{
 		CHECK_AND_ASSERT_MES(!vec.empty(), T(), "Vector must be non-empty");
-		
+
 		size_t idx = crypto::rand<size_t>() % vec.size();
 		return pop_index (vec, idx);
 	}
@@ -420,12 +420,12 @@ void monero_transfer_utils::create_transaction(
 	const account_keys& sender_account_keys, // this will reference a particular hw::device
 	const uint32_t subaddr_account_idx,
 	const std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses,
-	const address_parse_info &to_addr, 
+	const address_parse_info &to_addr,
 	uint64_t sending_amount,
 	uint64_t change_amount,
 	uint64_t fee_amount,
 	const vector<SpendableOutput> &outputs,
-	vector<RandomAmountOutputs> &mix_outs, 
+	vector<RandomAmountOutputs> &mix_outs,
 	const std::vector<uint8_t> &extra,
 	use_fork_rules_fn_type use_fork_rules_fn,
 	uint64_t unlock_time, // or 0
@@ -590,19 +590,27 @@ void monero_transfer_utils::create_transaction(
 		//
 		src.rct = outputs[out_index].rct != boost::none && (*(outputs[out_index].rct)).empty() == false;
 		if (src.rct) {
-			rct::key decrypted_mask;
-			bool r = _rct_hex_to_decrypted_mask(
-				*(outputs[out_index].rct),
-				sender_account_keys.m_view_secret_key,
-				tx_pub_key,
-				internal_output_index,
-				decrypted_mask
-			);
-			if (!r) {
-				retVals.errCode = cantGetDecryptedMaskFromRCTHex;
-				return;
+			if (!outputs[out_index].mask.empty()) {
+				if (!string_tools::hex_to_pod(outputs[out_index].mask, src.mask)) {
+					retVals.errCode = mixRCTOutsMissingCommit;
+					return;
+				}
+			} else {
+				rct::key decrypted_mask;
+				bool r = _rct_hex_to_decrypted_mask(
+					*(outputs[out_index].rct),
+					sender_account_keys.m_view_secret_key,
+					tx_pub_key,
+					internal_output_index,
+					decrypted_mask
+				);
+				if (!r) {
+					retVals.errCode = cantGetDecryptedMaskFromRCTHex;
+					return;
+				}
+				src.mask = decrypted_mask;
 			}
-			src.mask = decrypted_mask;
+
 //			rct::key calculated_commit = rct::commit(outputs[out_index].amount, decrypted_mask);
 //			rct::key parsed_commit;
 //			_rct_hex_to_rct_commit(*(outputs[out_index].rct), parsed_commit);
@@ -810,6 +818,6 @@ void monero_transfer_utils::convenience__create_transaction(
 	//
 //	cout << "out 0: " << string_tools::pod_to_hex(boost::get<txout_to_key>((*(actualCall_retVals.tx)).vout[0].target).key) << endl;
 //	cout << "out 1: " << string_tools::pod_to_hex(boost::get<txout_to_key>((*(actualCall_retVals.tx)).vout[1].target).key) << endl;
-	//	
+	//
 	retVals.txBlob_byteLength = txBlob_byteLength;
 }

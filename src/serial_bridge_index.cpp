@@ -1314,6 +1314,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
 		out.public_key = output_desc.second.get<string>("public_key");
+		out.mask = output_desc.second.get<string>("mask");
 		out.rct = output_desc.second.get_optional<string>("rct");
 		if (out.rct != none && (*out.rct).empty() == true) {
 			out.rct = none; // send to 'none' if empty str for safety

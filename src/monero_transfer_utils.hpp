@@ -66,6 +66,7 @@ namespace monero_transfer_utils
 		uint64_t index;
 		string tx_pub_key;
 		std::vector<string> additional_tx_pubs;
+		string mask;
 	};
 	struct RandomAmountOutput
 	{
@@ -159,7 +160,7 @@ namespace monero_transfer_utils
 		}
 	}
 	//
-	// See monero_send_routine for actual app-lvl interface used by lightwallets 
+	// See monero_send_routine for actual app-lvl interface used by lightwallets
 	//
 	//
 	// Send_Step* functions procedure for integrators:
