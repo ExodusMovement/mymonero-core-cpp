@@ -614,6 +614,7 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos
 		out_ptree.put("key_image", utxo.key_image);
 		out_ptree.put("index_major", utxo.index.major);
 		out_ptree.put("index_minor", utxo.index.minor);
+		out_ptree.put("mask", epee::string_tools::pod_to_hex(utxo.mask));
 
 		if (native) {
 			out_ptree.put("pub", epee::string_tools::pod_to_hex(utxo.pub));
@@ -652,7 +653,7 @@ boost::property_tree::ptree serial_bridge::pruned_block_to_json(const PrunedBloc
 	return block_tree;
 }
 
-string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index)
+string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask)
 {
 	if (version == 1) {
 		return amount;
@@ -660,7 +661,6 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 		crypto::secret_key scalar;
 		hw::get_device("default").derivation_to_scalar(derivation, index, scalar);
 
-		rct::key mask;
 		rct::xmr_amount decoded_amount;
 
 		if (rv.type == rct::RCTTypeFull) {
@@ -709,7 +709,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		utxo.tx_id = tx.id;
 		utxo.index = subaddr_recv_info->index;
 		utxo.vout = output.index;
-		utxo.amount = serial_bridge::decode_amount(tx.version, subaddr_recv_info->derivation, tx.rv, output.amount, output.index);
+		utxo.amount = serial_bridge::decode_amount(tx.version, subaddr_recv_info->derivation, tx.rv, output.amount, output.index, utxo.mask);
 		utxo.tx_pub = tx.pub;
 		utxo.pub = output.pub;
 		utxo.rv = serial_bridge::build_rct(tx.rv, output.index);
