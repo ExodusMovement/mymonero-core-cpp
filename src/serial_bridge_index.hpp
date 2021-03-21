@@ -76,6 +76,11 @@ namespace serial_bridge
 		uint64_t block_height;
 	};
 
+	struct PrecomputedProps {
+		crypto::key_derivation derivation;
+		std::vector<crypto::key_derivation> additional_derivations;
+	};
+
 	struct BridgeTransaction {
 		std::string id;
 		uint8_t version;
@@ -90,6 +95,14 @@ namespace serial_bridge
 		std::vector<crypto::key_image> inputs;
 		std::vector<Output> outputs;
 		std::vector<Utxo> utxos;
+
+		// Extracted
+		size_t block_index;
+		size_t tx_index;
+		std::vector<cryptonote::txin_v> vin;
+
+		// precomputed in parallel
+		std::map<std::string, PrecomputedProps> cache_per_wallet;
 	};
 
 	struct Mixin {
@@ -154,8 +167,8 @@ namespace serial_bridge
 	crypto::public_key get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::vector<crypto::public_key> get_extra_additional_tx_pub_keys(const std::vector<cryptonote::tx_extra_field> &fields);
 	std::string get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields);
-	std::vector<crypto::key_image> get_inputs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &gki);
-	std::vector<crypto::key_image> get_inputs_with_send_txs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &send_txs);
+	std::vector<crypto::key_image> get_inputs(const BridgeTransaction &bridge_tx, std::map<std::string, bool> &gki);
+	std::vector<crypto::key_image> get_inputs_with_send_txs(const BridgeTransaction &bridge_tx, std::map<std::string, bool> &send_txs);
 	std::vector<Output> get_outputs(const cryptonote::transaction &tx);
 	rct::xmr_amount get_fee(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx);
 	std::string build_rct(const rct::rctSig &rv, size_t index);
@@ -164,7 +177,8 @@ namespace serial_bridge
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask);
-	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
+	void precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys);
+	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, PrecomputedProps cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
 
 	ExtractUtxosResponse extract_utxos_raw(const string &args_string);
 

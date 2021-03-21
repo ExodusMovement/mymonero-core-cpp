@@ -49,6 +49,7 @@
 #include "storages/portable_storage_template_helper.h"
 //
 #include "serial_bridge_utils.hpp"
+#include "threadpool.h"
 
 #ifdef __linux__
 #ifndef __ANDROID_API__
@@ -157,6 +158,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 	auto blocks = resp.blocks;
 
+	std::vector<BridgeTransaction> txs;
 	for (size_t i = 0; i < resp.blocks.size(); i++) {
 		auto block_entry = resp.blocks[i];
 
@@ -178,6 +180,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 		pruned_block.block_height = height;
 		pruned_block.timestamp = b.timestamp;
+
 		for (size_t j = 0; j < block_entry.txs.size(); j++) {
 			auto tx_entry = block_entry.txs[j];
 
@@ -201,6 +204,11 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
 			bridge_tx.outputs = get_outputs(tx);
 
+			// Extracted
+			bridge_tx.vin = tx.vin;
+			bridge_tx.block_index = i;
+			bridge_tx.tx_index = j;
+
 			auto nonce = get_extra_nonce(fields);
 			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
 				cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
@@ -219,32 +227,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 				}
 			}
 
-			for (auto& pair : wallet_accounts_params) {
-				auto bridge_tx_copy = bridge_tx;
-
-				auto& wallet_account_params = pair.second;
-				bridge_tx_copy.inputs = wallet_account_params.has_send_txs ?
-					get_inputs_with_send_txs(tx, bridge_tx_copy, wallet_account_params.send_txs) :
-					get_inputs(tx, bridge_tx_copy, wallet_account_params.gki);
-
-				auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys, wallet_account_params.subaddresses);
-
-				for (size_t k = 0; k < tx_utxos.size(); k++) {
-					auto &utxo = tx_utxos[k];
-					utxo.global_index = resp.output_indices[i].indices[j + 1].indices[utxo.vout];
-
-					if (!wallet_account_params.has_send_txs) {
-						wallet_account_params.gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
-					}
-				}
-
-				bridge_tx_copy.utxos = tx_utxos;
-
-				if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0) {
-					auto &result = native_resp.results_by_wallet_account[pair.first];
-					result.txs.push_back(bridge_tx_copy);
-				}
-			}
+			txs.push_back(bridge_tx);
 		}
 
 		#ifndef EMSCRIPTEN
@@ -263,6 +246,50 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			f.close();
 		}
 		#endif
+	}
+
+	// Precomputing deriviation in parallel
+	threadpool pool;
+	for (auto& tx : txs) {
+		for (auto& pair : wallet_accounts_params) {
+			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys); });
+		}
+	}
+
+	pool.wait();
+
+	for (auto &bridge_tx : txs) {
+		for (auto& pair : wallet_accounts_params) {
+				auto bridge_tx_copy = bridge_tx;
+
+				auto& wallet_account_params = pair.second;
+				bridge_tx_copy.inputs = wallet_account_params.has_send_txs ?
+					get_inputs_with_send_txs(bridge_tx_copy, wallet_account_params.send_txs) :
+					get_inputs(bridge_tx_copy, wallet_account_params.gki);
+
+				auto tx_utxos = extract_utxos_from_tx(
+					bridge_tx_copy,
+					bridge_tx_copy.cache_per_wallet[pair.first],
+					wallet_account_params.account_keys,
+					wallet_account_params.subaddresses
+				);
+
+				for (size_t k = 0; k < tx_utxos.size(); k++) {
+					auto &utxo = tx_utxos[k];
+					utxo.global_index = resp.output_indices[bridge_tx_copy.block_index].indices[bridge_tx_copy.tx_index + 1].indices[utxo.vout];
+
+					if (!wallet_account_params.has_send_txs) {
+						wallet_account_params.gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
+					}
+				}
+
+				bridge_tx_copy.utxos = tx_utxos;
+
+				if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0) {
+					auto &result = native_resp.results_by_wallet_account[pair.first];
+					result.txs.push_back(bridge_tx_copy);
+				}
+			}
 	}
 
 	for (const auto& pair : wallet_accounts_params) {
@@ -397,11 +424,10 @@ std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extr
 	return "";
 }
 
-std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &gki) {
+std::vector<crypto::key_image> serial_bridge::get_inputs(const BridgeTransaction &bridge_tx, std::map<std::string, bool> &gki) {
 	std::vector<crypto::key_image> inputs;
 
-	for (size_t i = 0; i < tx.vin.size(); i++) {
-		auto &tx_in = tx.vin[i];
+	for (auto &tx_in : bridge_tx.vin) {
 		if (tx_in.type() != typeid(cryptonote::txin_to_key)) continue;
 
 		auto image = boost::get<cryptonote::txin_to_key>(tx_in).k_image;
@@ -417,14 +443,13 @@ std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::trans
 	return inputs;
 }
 
-std::vector<crypto::key_image> serial_bridge::get_inputs_with_send_txs(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx, std::map<std::string, bool> &send_txs) {
+std::vector<crypto::key_image> serial_bridge::get_inputs_with_send_txs(const BridgeTransaction &bridge_tx, std::map<std::string, bool> &send_txs) {
 	std::vector<crypto::key_image> inputs;
 
 	auto it = send_txs.find(bridge_tx.id);
 	if (it == send_txs.end()) return inputs;
 
-	for (size_t i = 0; i < tx.vin.size(); i++) {
-		auto &tx_in = tx.vin[i];
+	for (auto &tx_in : bridge_tx.vin) {
 		if (tx_in.type() != typeid(cryptonote::txin_to_key)) continue;
 
 		auto image = boost::get<cryptonote::txin_to_key>(tx_in).k_image;
@@ -677,32 +702,44 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 
 	return "";
 }
-std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
-{
-	hw::device &hwdev = hw::get_device("default");
 
-	std::vector<Utxo> utxos;
+void serial_bridge::precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys) {
 
-	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-	if (!crypto::generate_key_derivation(tx.pub, account_keys.m_view_secret_key, derivation)) {
-		return utxos;
+	// NOTE: slow 300qs
+	if (!crypto::generate_key_derivation(tx.pub, account_keys.m_view_secret_key, cache.derivation)) {
+		return;
 	}
 
-	std::vector<crypto::key_derivation> additional_derivations;
 	for (const auto& pub : tx.additional_pubs) {
 		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
 
+		// NOTE: slow 300qs * ADDITIONAL_PUBS
 		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, additional_derivation)) {
-			return utxos;
+			return;
 		}
 
-		additional_derivations.push_back(additional_derivation);
+		cache.additional_derivations.push_back(additional_derivation);
 	}
+}
 
+std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, PrecomputedProps cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
+{
+	hw::device &hwdev = hw::get_device("default");
+	std::vector<Utxo> utxos;
+
+	// TOOD: Need to filter transactions that failed to generate deriviations
 
 	BOOST_FOREACH(auto &output, tx.outputs)
 	{
-		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev);
+		// NOTE: slow 150-250qs
+		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(
+			subaddresses,
+			output.pub,
+			cache.derivation,
+			cache.additional_derivations,
+			output.index,
+			hwdev
+		);
 		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
@@ -773,18 +810,30 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		response.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractUtxosResult {}));
 	}
 
+	std::vector<BridgeTransaction> txs;
 	for (const auto& tx_desc : json_root.get_child("txs")) {
 		assert(tx_desc.first.empty());
 
-		BridgeTransaction tx;
 		try {
-			tx = serial_bridge::json_to_tx(tx_desc.second);
+			txs.push_back(serial_bridge::json_to_tx(tx_desc.second));
 		} catch(std::invalid_argument err) {
 			continue;
 		}
+	}
 
+	// Precomputing deriviation in parallel
+	threadpool pool;
+	for (auto& tx : txs) {
 		for (auto& pair : wallet_accounts_params) {
-			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, pair.second.account_keys, pair.second.subaddresses);
+			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys); });
+		}
+	}
+
+	pool.wait();
+
+	for (auto& tx : txs) {
+		for (auto& pair : wallet_accounts_params) {
+			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses);
 
 			auto &result = response.results_by_wallet_account[pair.first];
 			result.utxos.insert(std::end(result.utxos), std::begin(tx_utxos), std::end(tx_utxos));
