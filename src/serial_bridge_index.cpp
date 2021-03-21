@@ -158,79 +158,100 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 	auto blocks = resp.blocks;
 
-	std::vector<BridgeTransaction> txs;
+	threadpool pool;
+
+	std::vector<ProcessedBlock> processed_blocks;
+	processed_blocks.resize(resp.blocks.size());
 	for (size_t i = 0; i < resp.blocks.size(); i++) {
 		auto block_entry = resp.blocks[i];
+		auto output_indices = resp.output_indices[i];
 
-		PrunedBlock pruned_block;
-		cryptonote::block b;
+		auto f = [&processed_blocks, block_entry, output_indices, &native_resp, i]() {
+			ProcessedBlock p;
 
-		crypto::hash block_hash;
-		if (!parse_and_validate_block_from_blob(block_entry.block, b, block_hash)) {
-			continue;
-		}
+			PrunedBlock pruned_block;
+			cryptonote::block b;
 
-		auto gen_tx = b.miner_tx.vin[0];
-		if (gen_tx.type() != typeid(cryptonote::txin_gen)) {
-			continue;
-		}
-
-		uint64_t height = boost::get<cryptonote::txin_gen>(gen_tx).height;
-		native_resp.end_height = std::max(native_resp.end_height, height);
-
-		pruned_block.block_height = height;
-		pruned_block.timestamp = b.timestamp;
-
-		for (size_t j = 0; j < block_entry.txs.size(); j++) {
-			auto tx_entry = block_entry.txs[j];
-
-			cryptonote::transaction tx;
-
-			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_entry.blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_entry.blob, tx);
-			if (!tx_parsed) continue;
-
-			std::vector<cryptonote::tx_extra_field> fields;
-			auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
-			if (!extra_parsed) continue;
-
-			BridgeTransaction bridge_tx;
-			bridge_tx.id = epee::string_tools::pod_to_hex(b.tx_hashes[j]);
-			bridge_tx.version = tx.version;
-			bridge_tx.timestamp = b.timestamp;
-			bridge_tx.block_height = height;
-			bridge_tx.rv = tx.rct_signatures;
-			bridge_tx.pub = get_extra_pub_key(fields);
-			bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
-			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
-			bridge_tx.outputs = get_outputs(tx);
-
-			// Extracted
-			bridge_tx.vin = tx.vin;
-			bridge_tx.block_index = i;
-			bridge_tx.tx_index = j;
-
-			auto nonce = get_extra_nonce(fields);
-			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
-				cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
+			crypto::hash block_hash;
+			if (!parse_and_validate_block_from_blob(block_entry.block, b, block_hash)) {
+				return;
 			}
 
-			if (bridge_tx.version == 2) {
-				for (size_t k = 0; k < bridge_tx.outputs.size(); k++) {
-					auto &output = bridge_tx.outputs[k];
+			auto gen_tx = b.miner_tx.vin[0];
+			if (gen_tx.type() != typeid(cryptonote::txin_gen)) {
+				return;
+			}
 
-					Mixin mixin;
-					mixin.global_index = resp.output_indices[i].indices[j + 1].indices[output.index];
-					mixin.public_key = output.pub;
-					mixin.rct = build_rct(bridge_tx.rv, output.index);
+			uint64_t height = boost::get<cryptonote::txin_gen>(gen_tx).height;
+			native_resp.end_height = std::max(native_resp.end_height, height);
 
-					pruned_block.mixins.push_back(mixin);
+			pruned_block.block_height = height;
+			pruned_block.timestamp = b.timestamp;
+
+			for (size_t j = 0; j < block_entry.txs.size(); j++) {
+				auto tx_entry = block_entry.txs[j];
+
+				cryptonote::transaction tx;
+
+				auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_entry.blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_entry.blob, tx);
+				if (!tx_parsed) continue;
+
+				std::vector<cryptonote::tx_extra_field> fields;
+				auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
+				if (!extra_parsed) continue;
+
+				BridgeTransaction bridge_tx;
+				bridge_tx.id = epee::string_tools::pod_to_hex(b.tx_hashes[j]);
+				bridge_tx.version = tx.version;
+				bridge_tx.timestamp = b.timestamp;
+				bridge_tx.block_height = height;
+				bridge_tx.rv = tx.rct_signatures;
+				bridge_tx.pub = get_extra_pub_key(fields);
+				bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
+				bridge_tx.fee_amount = get_fee(tx, bridge_tx);
+				bridge_tx.outputs = get_outputs(tx);
+
+				// Extracted
+				bridge_tx.vin = tx.vin;
+				bridge_tx.block_index = i;
+				bridge_tx.tx_index = j;
+
+				auto nonce = get_extra_nonce(fields);
+				if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8)) {
+					cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
 				}
+
+				if (bridge_tx.version == 2) {
+					for (size_t k = 0; k < bridge_tx.outputs.size(); k++) {
+						auto &output = bridge_tx.outputs[k];
+
+						Mixin mixin;
+						mixin.global_index = output_indices.indices[j + 1].indices[output.index];
+						mixin.public_key = output.pub;
+						mixin.rct = build_rct(bridge_tx.rv, output.index);
+
+						pruned_block.mixins.push_back(mixin);
+					}
+				}
+
+				p.txs.push_back(bridge_tx);
 			}
 
-			txs.push_back(bridge_tx);
-		}
+			processed_blocks[i] = p;
+		};
+
+		pool.submit(f);
+	}
+
+	pool.wait();
+
+	std::vector<BridgeTransaction> txs;
+	for (auto &processed_block : processed_blocks) {
+		txs.insert(txs.end(), processed_block.txs.begin(), processed_block.txs.end());
 
 		#ifndef EMSCRIPTEN
+		auto pruned_block = processed_block.block;
+
 		if (pruned_block.block_height >= oldest && pruned_block.block_height <= latest) continue;
 		if (size <= 100 || arc4random_uniform(100) < storage_rate) {
 			std::ofstream f;
@@ -249,7 +270,6 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	}
 
 	// Precomputing deriviation in parallel
-	threadpool pool;
 	for (auto& tx : txs) {
 		for (auto& pair : wallet_accounts_params) {
 			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses); });

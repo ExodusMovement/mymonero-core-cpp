@@ -119,6 +119,11 @@ namespace serial_bridge
 		std::vector<Mixin> mixins;
 	};
 
+	struct ProcessedBlock {
+		PrunedBlock block;
+		std::vector<BridgeTransaction> txs;
+	};
+
 	struct WalletAccountParamsBase {
 		cryptonote::account_keys account_keys;
 		std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;

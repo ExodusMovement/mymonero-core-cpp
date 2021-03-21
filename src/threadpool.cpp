@@ -11,6 +11,8 @@ void threadpool::wait() {
     for (auto &thread : threads) {
         thread.join();
     }
+
+    threads.clear();
 }
 
 unsigned int threadpool::get_n_threads() {
