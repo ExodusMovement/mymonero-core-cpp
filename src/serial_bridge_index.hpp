@@ -36,10 +36,11 @@
 #include <string>
 #include <boost/property_tree/ptree.hpp>
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "cryptonote_config.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/subaddress_index.h"
 #include "cryptonote_basic/tx_extra.h"
+#include "cryptonote_config.h"
+#include "cryptonote_format_utils.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
@@ -79,6 +80,7 @@ namespace serial_bridge
 	struct PrecomputedProps {
 		crypto::key_derivation derivation;
 		std::vector<crypto::key_derivation> additional_derivations;
+		std::vector<boost::optional<cryptonote::subaddress_receive_info>> subaddr_recv_info_per_utxo;
 	};
 
 	struct BridgeTransaction {
@@ -177,7 +179,7 @@ namespace serial_bridge
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask);
-	void precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys);
+	void precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, PrecomputedProps cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
 
 	ExtractUtxosResponse extract_utxos_raw(const string &args_string);

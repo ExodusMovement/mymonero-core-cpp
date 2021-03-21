@@ -252,7 +252,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	threadpool pool;
 	for (auto& tx : txs) {
 		for (auto& pair : wallet_accounts_params) {
-			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys); });
+			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses); });
 		}
 	}
 
@@ -703,7 +703,9 @@ string serial_bridge::decode_amount(int version, crypto::key_derivation derivati
 	return "";
 }
 
-void serial_bridge::precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys) {
+void serial_bridge::precompute_tx(BridgeTransaction tx, PrecomputedProps &cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
+{
+	hw::device &hwdev = hw::get_device("default");
 
 	// NOTE: slow 300qs
 	if (!crypto::generate_key_derivation(tx.pub, account_keys.m_view_secret_key, cache.derivation)) {
@@ -720,17 +722,8 @@ void serial_bridge::precompute_tx(BridgeTransaction tx, PrecomputedProps &cache,
 
 		cache.additional_derivations.push_back(additional_derivation);
 	}
-}
 
-std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, PrecomputedProps cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
-{
-	hw::device &hwdev = hw::get_device("default");
-	std::vector<Utxo> utxos;
-
-	// TOOD: Need to filter transactions that failed to generate deriviations
-
-	BOOST_FOREACH(auto &output, tx.outputs)
-	{
+	for (auto &output : tx.outputs) {
 		// NOTE: slow 150-250qs
 		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(
 			subaddresses,
@@ -740,6 +733,22 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, Pre
 			output.index,
 			hwdev
 		);
+
+		cache.subaddr_recv_info_per_utxo.push_back(subaddr_recv_info);
+	}
+}
+
+std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, PrecomputedProps cache, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses)
+{
+	hw::device &hwdev = hw::get_device("default");
+	std::vector<Utxo> utxos;
+
+	// TOOD: Need to filter transactions that failed to generate deriviations
+
+	int i = 0;
+	BOOST_FOREACH(auto &output, tx.outputs)
+	{
+		boost::optional<subaddress_receive_info> subaddr_recv_info = cache.subaddr_recv_info_per_utxo[i++];
 		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
@@ -825,7 +834,7 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 	threadpool pool;
 	for (auto& tx : txs) {
 		for (auto& pair : wallet_accounts_params) {
-			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys); });
+			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses); });
 		}
 	}
 
