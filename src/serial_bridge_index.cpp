@@ -269,10 +269,19 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 		#endif
 	}
 
+	auto limit = TXS_PER_CHUNK;
+
 	// Precomputing deriviation in parallel
-	for (auto& tx : txs) {
-		for (auto& pair : wallet_accounts_params) {
-			pool.submit([&tx, pair]() mutable { precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses); });
+	for (auto& pair : wallet_accounts_params) {
+		for (size_t i = 0; i < txs.size(); i += limit) {
+			auto f = [i, limit, &txs, &pair]() {
+				for (size_t j = i; j < std::min(i + limit, txs.size()); j++) {
+					auto &tx = txs[j];
+					precompute_tx(tx, tx.cache_per_wallet[pair.first], pair.second.account_keys, pair.second.subaddresses);
+				}
+			};
+
+			pool.submit(f);
 		}
 	}
 

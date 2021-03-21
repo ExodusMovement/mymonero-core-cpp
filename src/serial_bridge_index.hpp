@@ -45,6 +45,7 @@
 #include "ringct/rctTypes.h"
 
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
+#define TXS_PER_CHUNK 20
 
 //
 // See serial_bridge_utils.hpp
