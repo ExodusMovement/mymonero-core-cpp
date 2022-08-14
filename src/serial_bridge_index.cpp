@@ -65,24 +65,26 @@ using namespace monero_fork_rules;
 using namespace serial_bridge;
 using namespace serial_bridge_utils;
 
-const char *serial_bridge::create_blocks_request(int height, size_t *length) {
+const char *serial_bridge::create_blocks_request(int height, size_t *length)
+{
 	crypto::hash genesis;
 	epee::string_tools::hex_to_pod("418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3", genesis);
 
-	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::request req;
+	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::request req = AUTO_VAL_INIT(req);
+
 	req.block_ids.push_back(genesis);
 	req.start_height = height;
 	req.prune = true;
 	req.no_miner_tx = false;
 
-	std::string m_body;
-	epee::serialization::store_t_to_binary(req, m_body);
+	epee::byte_slice m_body;
+	epee::serialization::store_t_to_binary(req, m_body, 16 * 1024);
 
-	*length = m_body.length();
-	char *arr =  (char *)malloc(m_body.length());
+	*length = m_body.size();
+	char *arr = (char *)malloc(m_body.size());
 	std::copy(m_body.begin(), m_body.end(), arr);
 
-	return (const char *) arr;
+	return (const char *)arr;
 }
 
 NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
