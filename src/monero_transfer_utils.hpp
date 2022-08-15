@@ -205,9 +205,9 @@ namespace monero_transfer_utils
 		uint64_t fee_per_b, // per v8
 		uint64_t fee_quantization_mask,
 		//
-		optional<uint64_t> passedIn_attemptAt_fee // use this for passing step2 "must-reconstruct" return values back in, i.e. re-entry; when nil, defaults to attempt at network min
+		optional<uint64_t> prior_attempt_size_calcd_fee, // use this for passing step2 "must-reconstruct" return values back in, i.e. re-entry; when nil, defaults to attempt at network min
+		optional<SpendableOutputToRandomAmountOutputs> prior_attempt_unspent_outs_to_mix_outs = none // use this to make sure upon re-attempting, the calculated fee will be the result of calculate_fee()
 	);
-	//
 	struct Tie_Outs_to_Mix_Outs_RetVals
 	{
 		CreateTransactionErrorCode errCode; // if != noError, abort Send process

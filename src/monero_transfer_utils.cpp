@@ -196,7 +196,8 @@ void monero_transfer_utils::send_step1__prepare_params_for_get_decoys(
 	uint64_t fee_per_b, // per v8
 	uint64_t fee_quantization_mask,
 	//
-	optional<uint64_t> passedIn_attemptAt_fee
+	optional<uint64_t> prior_attempt_size_calcd_fee,
+	optional<SpendableOutputToRandomAmountOutputs> prior_attempt_unspent_outs_to_mix_outs
 ) {
 	retVals = {};
 	//
@@ -232,12 +233,12 @@ void monero_transfer_utils::send_step1__prepare_params_for_get_decoys(
 	const uint64_t fee_multiplier = get_fee_multiplier(simple_priority, default_priority(), get_fee_algorithm(use_fork_rules_fn), use_fork_rules_fn);
 	//
 	uint64_t attempt_at_min_fee;
-	if (passedIn_attemptAt_fee == none) {
-		attempt_at_min_fee = estimate_fee(true/*use_per_byte_fee*/, true/*use_rct*/, 2/*est num inputs*/, fake_outs_count, 2, extra.size(), bulletproof, clsag, base_fee, fee_multiplier, fee_quantization_mask);
-		// opted to do this instead of `const uint64_t min_fee = (fee_multiplier * base_fee * estimate_tx_size(use_rct, 1, fake_outs_count, 2, extra.size(), bulletproof));`
-		// TODO: estimate with 1 input or 2?
+	if (prior_attempt_size_calcd_fee == none) {
+		attempt_at_min_fee = estimate_fee(true/*use_per_byte_fee*/, true/*use_rct*/, 1/*est num inputs*/, fake_outs_count, 2, extra.size(), bulletproof, clsag, base_fee, fee_multiplier, fee_quantization_mask);
+		// use a minimum viable estimate_fee() with 1 input. It would be better to under-shoot this estimate, and then need to use a higher fee  from calculate_fee() because the estimate is too low,
+		// versus the worse alternative of over-estimating here and getting stuck using too high of a fee that leads to fingerprinting
 	} else {
-		attempt_at_min_fee = *passedIn_attemptAt_fee;
+		attempt_at_min_fee = *prior_attempt_size_calcd_fee;
 	}
 	struct Total
 	{
@@ -257,6 +258,20 @@ void monero_transfer_utils::send_step1__prepare_params_for_get_decoys(
 	// Gather outputs and amount to use for getting decoy outputs…
 	uint64_t using_outs_amount = 0;
 	vector<SpendableOutput>  remaining_unusedOuts = unspent_outs; // take copy so not to modify original
+
+	// start by using all the passed in outs that were selected in a prior tx construction attempt
+	if (prior_attempt_unspent_outs_to_mix_outs != none) {
+		for (size_t i = 0; i < remaining_unusedOuts.size(); ++i) {
+			SpendableOutput &out = remaining_unusedOuts[i];
+
+			// search for out by public key to see if it should be re-used in an attempt
+			if (prior_attempt_unspent_outs_to_mix_outs->find(out.public_key) != prior_attempt_unspent_outs_to_mix_outs->end()) {
+				using_outs_amount += out.amount;
+				retVals.using_outs.push_back(std::move(pop_index(remaining_unusedOuts, i)));
+			}
+		}
+	}
+
 	// TODO: factor this out to get spendable balance for display in the MM wallet:
 	while (using_outs_amount < potential_total && remaining_unusedOuts.size() > 0) {
 		auto out = pop_random_value(remaining_unusedOuts);
@@ -286,7 +301,7 @@ void monero_transfer_utils::send_step1__prepare_params_for_get_decoys(
 		bulletproof, clsag, base_fee, fee_multiplier, fee_quantization_mask
 	);
 	// if newNeededFee < neededFee, use neededFee instead (should only happen on the 2nd or later times through (due to estimated fee being too low))
-	if (needed_fee < attempt_at_min_fee) {
+	if (prior_attempt_size_calcd_fee != none && needed_fee < attempt_at_min_fee) {
 		needed_fee = attempt_at_min_fee;
 	}
 	//
