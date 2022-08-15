@@ -65,8 +65,6 @@ namespace monero_transfer_utils
 		uint64_t global_index;
 		uint64_t index;
 		string tx_pub_key;
-		std::vector<string> additional_tx_pubs;
-		string mask;
 	};
 	struct RandomAmountOutput
 	{
@@ -79,6 +77,8 @@ namespace monero_transfer_utils
 		uint64_t amount;
 		vector<RandomAmountOutput> outputs;
 	};
+	typedef std::unordered_map<string/*public_key*/, std::vector<RandomAmountOutput>> SpendableOutputToRandomAmountOutputs;
+
 	//
 	// Types - Return value
 	enum CreateTransactionErrorCode // TODO: switch to enum class to fix namespacing
@@ -106,6 +106,8 @@ namespace monero_transfer_utils
 		invalidPID						= 19,
 		enteredAmountTooLow				= 20,
 		cantGetDecryptedMaskFromRCTHex	= 21,
+		notEnoughUsableDecoysFound		= 22,
+		tooManyDecoysRemaining			= 23,
 		needMoreMoneyThanFound			= 90
 	};
 	static inline string err_msg_from_err_code__create_transaction(CreateTransactionErrorCode code)
@@ -201,6 +203,23 @@ namespace monero_transfer_utils
 		optional<uint64_t> passedIn_attemptAt_fee // use this for passing step2 "must-reconstruct" return values back in, i.e. re-entry; when nil, defaults to attempt at network min
 	);
 	//
+	struct Tie_Outs_to_Mix_Outs_RetVals
+	{
+		CreateTransactionErrorCode errCode; // if != noError, abort Send process
+		//
+		// Success parameters
+		vector<RandomAmountOutputs> mix_outs;
+		SpendableOutputToRandomAmountOutputs prior_attempt_unspent_outs_to_mix_outs_new;
+	};
+	void pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_attempts(
+		Tie_Outs_to_Mix_Outs_RetVals &retVals,
+		//
+		const vector<SpendableOutput> &using_outs,
+		vector<RandomAmountOutputs> mix_outs_from_server,
+		//
+		const optional<SpendableOutputToRandomAmountOutputs> &prior_attempt_unspent_outs_to_mix_outs
+	);
+	//
 	struct Send_Step2_RetVals
 	{
 		CreateTransactionErrorCode errCode; // if != noError, abort Send process
@@ -231,7 +250,6 @@ namespace monero_transfer_utils
 		uint64_t fee_per_b, // per v8
 		uint64_t fee_quantization_mask,
 		vector<RandomAmountOutputs> &mix_outs, // it gets sorted
-		uint32_t subaddresses_count,
 		use_fork_rules_fn_type use_fork_rules_fn,
 		uint64_t unlock_time, // or 0
 		cryptonote::network_type nettype
@@ -263,7 +281,6 @@ namespace monero_transfer_utils
 		uint64_t fee_amount,
 		const vector<SpendableOutput> &outputs,
 		vector<RandomAmountOutputs> &mix_outs, // get sorted
-		uint32_t subaddresses_count,
 		use_fork_rules_fn_type use_fork_rules_fn,
 		uint64_t unlock_time							= 0, // or 0
 		network_type nettype 							= MAINNET
