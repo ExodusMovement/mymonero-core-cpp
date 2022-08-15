@@ -82,11 +82,11 @@ namespace serial_bridge_utils
 	//
 	// JSON keys - Ret vals
 	// - - Error
-	static inline string ret_json_key__any__err_msg() { return "err_msg"; } // optional
+	static inline string ret_json_key__any__err_msg() { return "err_msg"; }	  // optional
 	static inline string ret_json_key__any__err_code() { return "err_code"; } // optional
 	//
 	// - - Shared
-	static inline string ret_json_key__generic_retVal() { return "retVal"; } 
+	static inline string ret_json_key__generic_retVal() { return "retVal"; }
 	// - - create_transaction / send
 	static inline string ret_json_key__send__spendable_balance() { return "spendable_balance"; }
 	static inline string ret_json_key__send__required_balance() { return "required_balance"; }
@@ -95,6 +95,9 @@ namespace serial_bridge_utils
 	static inline string ret_json_key__send__final_total_wo_fee() { return "final_total_wo_fee"; }
 	static inline string ret_json_key__send__change_amount() { return "change_amount"; }
 	static inline string ret_json_key__send__using_outs() { return "using_outs"; } // this list's members' keys should probably be declared (is this the best way to do this?)
+	static inline string ret_json_key__send__mix_outs() { return "mix_outs"; }
+	static inline string ret_json_key__send__prior_attempt_unspent_outs_to_mix_outs_new() { return "prior_attempt_unspent_outs_to_mix_outs_new"; }
+
 	//
 	static inline string ret_json_key__send__tx_must_be_reconstructed() { return "tx_must_be_reconstructed"; }
 	static inline string ret_json_key__send__fee_actually_needed() { return "fee_actually_needed"; }
