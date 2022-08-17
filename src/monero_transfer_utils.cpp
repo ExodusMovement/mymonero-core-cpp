@@ -748,7 +748,7 @@ void monero_transfer_utils::create_transaction(
 		retVals.errCode = transactionTooBig;
 		return;
 	}
-	bool use_bulletproofs = !tx.rct_signatures.p.bulletproofs.empty();
+	bool use_bulletproofs = !tx.rct_signatures.p.bulletproofs.empty() || !tx.rct_signatures.p.bulletproofs_plus.empty();
 	THROW_WALLET_EXCEPTION_IF(use_bulletproofs != true, error::wallet_internal_error, "Expected tx use_bulletproofs to equal bulletproof flag");
 	//
 	retVals.tx = tx;
