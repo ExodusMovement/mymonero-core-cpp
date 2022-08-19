@@ -499,16 +499,21 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 	for (size_t i = 0; i < tx.vout.size(); i++)
 	{
 		auto tx_out = tx.vout[i];
-
-		if (tx_out.target.type() != typeid(cryptonote::txout_to_key))
-			continue;
-		auto target = boost::get<cryptonote::txout_to_key>(tx_out.target);
-
+		
 		Output output;
 		output.index = i;
-		output.pub = target.key;
 		output.amount = std::to_string(tx_out.amount);
 
+		if (tx_out.target.type() == typeid(cryptonote::txout_to_key)) {
+			const auto &target = boost::get<cryptonote::txout_to_key>(tx_out.target);
+			output.pub = target.key;
+		} else if (tx_out.target.type() == typeid(cryptonote::txout_to_tagged_key)) {
+			const auto &target = boost::get<cryptonote::txout_to_tagged_key>(tx_out.target);
+			output.pub = target.key;
+		} else {
+			continue;
+		}
+		output.view_tag = cryptonote::get_output_view_tag(tx_out);
 		outputs.push_back(output);
 	}
 
