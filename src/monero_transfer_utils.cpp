@@ -734,8 +734,7 @@ void monero_transfer_utils::create_transaction(
 		sender_account_keys, subaddresses,
 		sources, splitted_dsts, change_dst.addr, extra,
 		tx, unlock_time, tx_key, additional_tx_keys,
-		true, rct_config,
-		/*m_multisig ? &msout : */NULL
+		true, rct_config, true
 	);
 	LOG_PRINT_L2("constructed tx, r="<<r);
 	if (!r) {
