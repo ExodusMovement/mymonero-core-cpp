@@ -57,6 +57,7 @@ namespace serial_bridge
 		uint8_t index;
 		crypto::public_key pub;
 		string amount;
+		boost::optional<crypto::view_tag> view_tag;
 	};
 
 	struct UtxoBase {
