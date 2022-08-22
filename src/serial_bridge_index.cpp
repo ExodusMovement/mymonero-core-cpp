@@ -1287,8 +1287,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 		// The following will be set if errCode==needMoreMoneyThanFound - and i'm depending on them being 0 otherwise
 		root.put(ret_json_key__send__spendable_balance(), RetVals_Transforms::str_from(retVals.spendable_balance));
 		root.put(ret_json_key__send__required_balance(), RetVals_Transforms::str_from(retVals.required_balance));
-	}
-	else {
+	} else {
 		root.put(ret_json_key__send__mixin(), RetVals_Transforms::str_from(retVals.mixin));
 		root.put(ret_json_key__send__using_fee(), RetVals_Transforms::str_from(retVals.using_fee));
 		root.put(ret_json_key__send__final_total_wo_fee(), RetVals_Transforms::str_from(retVals.final_total_wo_fee));
@@ -1547,26 +1546,19 @@ string serial_bridge::decodeRct(const string &args_string) {
 	// got to be a better way to do this
 	if (rv_type_int == rct::RCTTypeNull) {
 		rv.type = rct::RCTTypeNull;
-	}
-	else if (rv_type_int == rct::RCTTypeSimple) {
+	} else if (rv_type_int == rct::RCTTypeSimple) {
 		rv.type = rct::RCTTypeSimple;
-	}
-	else if (rv_type_int == rct::RCTTypeFull) {
+	} else if (rv_type_int == rct::RCTTypeFull) {
 		rv.type = rct::RCTTypeFull;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof) {
+	} else if (rv_type_int == rct::RCTTypeBulletproof) {
 		rv.type = rct::RCTTypeBulletproof;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof2) {
+	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		rv.type = rct::RCTTypeBulletproof2;
-	}
-	else if (rv_type_int == rct::RCTTypeCLSAG) {
+	} else if (rv_type_int == rct::RCTTypeCLSAG) {
 		rv.type = rct::RCTTypeCLSAG;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
+	} else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
 		rv.type = rct::RCTTypeBulletproofPlus;
-	}
-	else {
+	} else {
 		return error_ret_json_from_message("Invalid 'rv.type'");
 	}
 	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo")) {
@@ -1632,26 +1624,19 @@ string serial_bridge::decodeRctSimple(const string &args_string) {
 	// got to be a better way to do this
 	if (rv_type_int == rct::RCTTypeNull) {
 		rv.type = rct::RCTTypeNull;
-	}
-	else if (rv_type_int == rct::RCTTypeSimple) {
+	} else if (rv_type_int == rct::RCTTypeSimple) {
 		rv.type = rct::RCTTypeSimple;
-	}
-	else if (rv_type_int == rct::RCTTypeFull) {
+	} else if (rv_type_int == rct::RCTTypeFull) {
 		rv.type = rct::RCTTypeFull;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof) {
+	} else if (rv_type_int == rct::RCTTypeBulletproof) {
 		rv.type = rct::RCTTypeBulletproof;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof2) {
+	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		rv.type = rct::RCTTypeBulletproof2;
-	}
-	else if (rv_type_int == rct::RCTTypeCLSAG) {
+	} else if (rv_type_int == rct::RCTTypeCLSAG) {
 		rv.type = rct::RCTTypeCLSAG;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
+	} else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
 		rv.type = rct::RCTTypeBulletproofPlus;
-	}
-	else {
+	} else {
 		return error_ret_json_from_message("Invalid 'rv.type'");
 	}
 	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo")) {
