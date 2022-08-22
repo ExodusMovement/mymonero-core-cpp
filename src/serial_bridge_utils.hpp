@@ -82,11 +82,11 @@ namespace serial_bridge_utils
 	//
 	// JSON keys - Ret vals
 	// - - Error
-	static inline string ret_json_key__any__err_msg() { return "err_msg"; }	  // optional
+	static inline string ret_json_key__any__err_msg() { return "err_msg"; } // optional
 	static inline string ret_json_key__any__err_code() { return "err_code"; } // optional
 	//
 	// - - Shared
-	static inline string ret_json_key__generic_retVal() { return "retVal"; }
+	static inline string ret_json_key__generic_retVal() { return "retVal"; } 
 	// - - create_transaction / send
 	static inline string ret_json_key__send__spendable_balance() { return "spendable_balance"; }
 	static inline string ret_json_key__send__required_balance() { return "required_balance"; }
