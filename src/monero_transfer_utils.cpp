@@ -520,11 +520,9 @@ void monero_transfer_utils::create_transaction(
 	int bp_version = 1;
 	if (use_fork_rules_fn(HF_VERSION_BULLETPROOF_PLUS, -10)) {
 		bp_version = 4;
-	}
-	else if (use_fork_rules_fn(HF_VERSION_CLSAG, -10)) {
+	} else if (use_fork_rules_fn(HF_VERSION_CLSAG, -10)) {
 		bp_version = 3;
-	}
-	else if (use_fork_rules_fn(HF_VERSION_SMALLER_BP, -10)) {
+	} else if (use_fork_rules_fn(HF_VERSION_SMALLER_BP, -10)) {
 		bp_version = 2;
 	}
 	const rct::RCTConfig rct_config {
