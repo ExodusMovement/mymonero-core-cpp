@@ -342,9 +342,9 @@ void _reenterable_construct_and_send_tx(
 	const _SendFunds_ConstructAndSendTx_Args &args,
 	//
 	// re-entry params
-	optional<uint64_t> prior_attempt_size_calcd_fee								= none,
-	optional<SpendableOutputToRandomAmountOutputs> prior_attempt_unspent_outs_to_mix_outs		= none,
-	size_t constructionAttempt												= 0
+	optional<uint64_t> prior_attempt_size_calcd_fee	= none,
+	optional<SpendableOutputToRandomAmountOutputs> prior_attempt_unspent_outs_to_mix_outs = none,
+	size_t constructionAttempt = 0
 ) {
 	args.status_update_fn(calculatingFee);
 	//
