@@ -65,8 +65,7 @@ using namespace monero_fork_rules;
 using namespace serial_bridge;
 using namespace serial_bridge_utils;
 
-const char *serial_bridge::create_blocks_request(int height, size_t *length)
-{
+const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	crypto::hash genesis;
 	epee::string_tools::hex_to_pod("418015bb9ae982a1975da7d79277c2705727a56894ba0fb246adaabb1f4632e3", genesis);
 
@@ -86,13 +85,11 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length)
 	return (const char *)arr;
 }
 
-NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string)
-{
+NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
 	NativeResponse native_resp;
 
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		native_resp.error = "Invalid JSON";
 		return native_resp;
 	}
@@ -171,8 +168,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 	auto blocks = resp.blocks;
 
-	for (size_t i = 0; i < resp.blocks.size(); i++)
-	{
+	for (size_t i = 0; i < resp.blocks.size(); i++) {
 		auto block_entry = resp.blocks[i];
 
 		PrunedBlock pruned_block;
@@ -293,8 +289,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 #endif
 	}
 
-	for (const auto &pair : wallet_accounts_params)
-	{
+	for (const auto &pair : wallet_accounts_params) {
 		auto &result = native_resp.results_by_wallet_account[pair.first];
 
 		result.subaddresses = pair.second.subaddresses.size();
@@ -308,14 +303,12 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	return native_resp;
 }
 
-std::string serial_bridge::extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string)
-{
+std::string serial_bridge::extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
 	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
 
 	boost::property_tree::ptree root;
 
-	if (!resp.error.empty())
-	{
+	if (!resp.error.empty()) {
 		root.put(ret_json_key__any__err_msg(), resp.error);
 		return ret_json_from_root(root);
 	}
@@ -327,8 +320,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	root.put("size", resp.size);
 
 	boost::property_tree::ptree results_tree;
-	for (const auto &pair : resp.results_by_wallet_account)
-	{
+	for (const auto &pair : resp.results_by_wallet_account) {
 		boost::property_tree::ptree txs_tree;
 		for (const auto &tx : pair.second.txs)
 		{
@@ -378,26 +370,22 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	return ret_json_from_root(root);
 }
 
-std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, size_t length)
-{
+std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, size_t length) {
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL_HASHES_BIN::response resp;
-	if (!epee::serialization::load_t_from_json(resp, m_body))
-	{
+	if (!epee::serialization::load_t_from_json(resp, m_body)) {
 		return error_ret_json_from_message("Network request failed");
 	}
 
-	if (resp.status != "OK")
-	{
+	if (resp.status != "OK") {
 		return error_ret_json_from_message("Network request failed");
 	}
 
 	boost::property_tree::ptree root;
 
 	boost::property_tree::ptree tx_hashes_tree;
-	for (int i = 0; i < resp.tx_hashes.size(); i++)
-	{
+	for (int i = 0; i < resp.tx_hashes.size(); i++) {
 		boost::property_tree::ptree tx_hash_tree;
 		tx_hash_tree.put("", epee::string_tools::pod_to_hex(resp.tx_hashes[i]));
 
@@ -408,10 +396,8 @@ std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, s
 	return ret_json_from_root(root);
 }
 
-crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields)
-{
-	for (size_t n = 0; n < fields.size(); ++n)
-	{
+crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote::tx_extra_field> &fields) {
+	for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_pub_key) == fields[n].type())
 		{
 			return boost::get<cryptonote::tx_extra_pub_key>(fields[n]).pub_key;
@@ -423,8 +409,7 @@ crypto::public_key serial_bridge::get_extra_pub_key(const std::vector<cryptonote
 
 std::vector<crypto::public_key> serial_bridge::get_extra_additional_tx_pub_keys(const std::vector<cryptonote::tx_extra_field> &fields)
 {
-	for (size_t n = 0; n < fields.size(); ++n)
-	{
+	for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_additional_pub_keys) == fields[n].type())
 		{
 			return boost::get<cryptonote::tx_extra_additional_pub_keys>(fields[n]).data;
@@ -436,8 +421,7 @@ std::vector<crypto::public_key> serial_bridge::get_extra_additional_tx_pub_keys(
 
 std::string serial_bridge::get_extra_nonce(const std::vector<cryptonote::tx_extra_field> &fields)
 {
-	for (size_t n = 0; n < fields.size(); ++n)
-	{
+	for (size_t n = 0; n < fields.size(); ++n) {
 		if (typeid(cryptonote::tx_extra_nonce) == fields[n].type())
 		{
 			return boost::get<cryptonote::tx_extra_nonce>(fields[n]).nonce;
@@ -451,8 +435,7 @@ std::vector<crypto::key_image> serial_bridge::get_inputs(const cryptonote::trans
 {
 	std::vector<crypto::key_image> inputs;
 
-	for (size_t i = 0; i < tx.vin.size(); i++)
-	{
+	for (size_t i = 0; i < tx.vin.size(); i++) {
 		auto &tx_in = tx.vin[i];
 		if (tx_in.type() != typeid(cryptonote::txin_to_key))
 			continue;
@@ -479,8 +462,7 @@ std::vector<crypto::key_image> serial_bridge::get_inputs_with_send_txs(const cry
 	if (it == send_txs.end())
 		return inputs;
 
-	for (size_t i = 0; i < tx.vin.size(); i++)
-	{
+	for (size_t i = 0; i < tx.vin.size(); i++) {
 		auto &tx_in = tx.vin[i];
 		if (tx_in.type() != typeid(cryptonote::txin_to_key))
 			continue;
@@ -496,8 +478,7 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 {
 	std::vector<Output> outputs;
 
-	for (size_t i = 0; i < tx.vout.size(); i++)
-	{
+	for (size_t i = 0; i < tx.vout.size(); i++) {
 		auto tx_out = tx.vout[i];
 		
 		Output output;
@@ -520,28 +501,22 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 	return outputs;
 }
 
-rct::xmr_amount serial_bridge::get_fee(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx)
-{
-	if (bridge_tx.version == 2)
-	{
+rct::xmr_amount serial_bridge::get_fee(const cryptonote::transaction &tx, const BridgeTransaction &bridge_tx) {
+	if (bridge_tx.version == 2) {
 		return bridge_tx.rv.txnFee;
 	}
 
-	if (bridge_tx.version == 1)
-	{
+	if (bridge_tx.version == 1) {
 		rct::xmr_amount fee_amount = 0;
 
-		for (size_t i = 0; i < tx.vin.size(); i++)
-		{
+		for (size_t i = 0; i < tx.vin.size(); i++) {
 			auto &in = tx.vin[i];
-			if (in.type() != typeid(cryptonote::txin_to_key))
-				continue;
+			if (in.type() != typeid(cryptonote::txin_to_key)) continue;
 
 			fee_amount += boost::get<cryptonote::txin_to_key>(in).amount;
 		}
 
-		for (size_t i = 0; i < tx.vout.size(); i++)
-		{
+		for (size_t i = 0; i < tx.vout.size(); i++) {
 			auto &out = tx.vout[i];
 			fee_amount -= out.amount;
 		}
@@ -552,10 +527,8 @@ rct::xmr_amount serial_bridge::get_fee(const cryptonote::transaction &tx, const 
 	return 0;
 }
 
-std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index)
-{
-	switch (rv.type)
-	{
+std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index) {
+	switch (rv.type) {
 	case rct::RCTTypeSimple:
 	case rct::RCTTypeFull:
 	case rct::RCTTypeBulletproof:
@@ -572,26 +545,22 @@ std::string serial_bridge::build_rct(const rct::rctSig &rv, size_t index)
 	}
 }
 
-BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
-{
+BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc) {
 	BridgeTransaction tx;
 
 	tx.id = tx_desc.get<string>("id");
 
-	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub))
-	{
+	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub)) {
 		throw std::invalid_argument("Invalid 'tx_desc.pub'");
 	}
 
-	for (const auto &additional_pub_desc : tx_desc.get_child("additional_pubs"))
-	{
+	for (const auto &additional_pub_desc : tx_desc.get_child("additional_pubs")) {
 		assert(additional_pub_desc.first.empty());
 
 		std::string pub_str = additional_pub_desc.second.get_value<std::string>();
 
 		crypto::public_key pub;
-		if (!epee::string_tools::hex_to_pod(pub_str, pub))
-		{
+		if (!epee::string_tools::hex_to_pod(pub_str, pub)) {
 			throw std::invalid_argument("Invalid 'tx_desc.additional_pubs.pub'");
 		}
 
@@ -604,84 +573,58 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
 
 	tx.rv = AUTO_VAL_INIT(tx.rv);
-	if (rv_type_int == rct::RCTTypeNull)
-	{
+	if (rv_type_int == rct::RCTTypeNull) {
 		tx.rv.type = rct::RCTTypeNull;
-	}
-	else if (rv_type_int == rct::RCTTypeSimple)
-	{
+	} else if (rv_type_int == rct::RCTTypeSimple) {
 		tx.rv.type = rct::RCTTypeSimple;
-	}
-	else if (rv_type_int == rct::RCTTypeFull)
-	{
+	} else if (rv_type_int == rct::RCTTypeFull) {
 		tx.rv.type = rct::RCTTypeFull;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof)
-	{
+	} else if (rv_type_int == rct::RCTTypeBulletproof) {
 		tx.rv.type = rct::RCTTypeBulletproof;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproof2)
-	{
+	} else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		tx.rv.type = rct::RCTTypeBulletproof2;
-	}
-	else if (rv_type_int == rct::RCTTypeCLSAG)
-	{
+	} else if (rv_type_int == rct::RCTTypeCLSAG) {
 		tx.rv.type = rct::RCTTypeCLSAG;
-	}
-	else if (rv_type_int == rct::RCTTypeBulletproofPlus)
-	{
+	} else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
 		tx.rv.type = rct::RCTTypeBulletproofPlus;
-	}
-	else
-	{
+	} else {
 		throw std::invalid_argument("Invalid 'tx_desc.rv.type'");
 	}
 
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo")) {
 		assert(ecdh_info_desc.first.empty()); // array elements have no names
 		auto ecdh_info = rct::ecdhTuple{};
-		if (tx.rv.type == rct::RCTTypeBulletproof2 || tx.rv.type == rct::RCTTypeCLSAG || tx.rv.type == rct::RCTTypeBulletproofPlus)
-		{
+		if (tx.rv.type == rct::RCTTypeBulletproof2 || tx.rv.type == rct::RCTTypeCLSAG || tx.rv.type == rct::RCTTypeBulletproofPlus) {
 			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), (crypto::hash8 &)ecdh_info.amount))
 			{
 				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].amount'");
 			}
-		}
-		else
-		{
-			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask))
-			{
+		} else {
+			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask)) {
 				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].mask'");
-			}
-			if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), ecdh_info.amount))
-			{
+			} if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("amount"), ecdh_info.amount)) {
 				throw std::invalid_argument("Invalid 'tx_desc.rv.ecdhInfo[].amount'");
 			}
 		}
 		tx.rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
 	}
 
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk")) {
 		assert(outPk_desc.first.empty()); // array elements have no names
 		auto outPk = rct::ctkey{};
-		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask))
-		{
+		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask)) {
 			throw std::invalid_argument("Invalid 'tx_desc.rv.outPk[].mask'");
 		}
 		tx.rv.outPk.push_back(outPk); // rct keys aren't movable
 	}
 
 	uint8_t curr = 0;
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &output_desc, tx_desc.get_child("outputs")) {
 		assert(output_desc.first.empty()); // array elements have no names
 		Output output;
 		output.index = curr++;
 
-		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub))
-		{
+		if (!epee::string_tools::hex_to_pod(output_desc.second.get<string>("pub"), output.pub)) {
 			throw std::invalid_argument("Invalid 'tx_desc.outputs.pub'");
 		}
 
@@ -692,12 +635,10 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 
 	return tx;
 }
-boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<crypto::key_image> inputs)
-{
+boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<crypto::key_image> inputs) {
 	boost::property_tree::ptree root;
 
-	for (int i = 0; i < inputs.size(); i++)
-	{
+	for (int i = 0; i < inputs.size(); i++) {
 		boost::property_tree::ptree input_tree;
 		input_tree.put("", epee::string_tools::pod_to_hex(inputs[i]));
 
@@ -706,11 +647,9 @@ boost::property_tree::ptree serial_bridge::inputs_to_json(std::vector<crypto::ke
 
 	return root;
 }
-boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos, bool native)
-{
+boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos, bool native) {
 	boost::property_tree::ptree utxos_ptree;
-	BOOST_FOREACH (auto &utxo, utxos)
-	{
+	BOOST_FOREACH (auto &utxo, utxos) {
 		auto out_ptree_pair = std::make_pair("", boost::property_tree::ptree{});
 		auto &out_ptree = out_ptree_pair.second;
 
@@ -721,14 +660,11 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos
 		out_ptree.put("index_minor", utxo.index.minor);
 		out_ptree.put("mask", epee::string_tools::pod_to_hex(utxo.mask));
 
-		if (native)
-		{
+		if (native) {
 			out_ptree.put("pub", epee::string_tools::pod_to_hex(utxo.pub));
 			out_ptree.put("global_index", utxo.global_index);
 			out_ptree.put("rv", utxo.rv);
-		}
-		else
-		{
+		} else {
 			out_ptree.put("tx_id", utxo.tx_id);
 		}
 
@@ -746,8 +682,7 @@ boost::property_tree::ptree serial_bridge::pruned_block_to_json(const PrunedBloc
 	block_tree.put("timestamp", pruned_block.timestamp);
 
 	boost::property_tree::ptree mixins_tree;
-	for (int i = 0; i < pruned_block.mixins.size(); i++)
-	{
+	for (int i = 0; i < pruned_block.mixins.size(); i++) {
 		auto &mixin = pruned_block.mixins[i];
 
 		boost::property_tree::ptree mixin_tree;
@@ -763,25 +698,19 @@ boost::property_tree::ptree serial_bridge::pruned_block_to_json(const PrunedBloc
 	return block_tree;
 }
 
-string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key &mask)
+string serial_bridge::decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask)
 {
-	if (version == 1)
-	{
+	if (version == 1) {
 		return amount;
-	}
-	else if (version == 2)
-	{
+	} else if (version == 2) {
 		crypto::secret_key scalar;
 		hw::get_device("default").derivation_to_scalar(derivation, index, scalar);
 
 		rct::xmr_amount decoded_amount;
 
-		if (rv.type == rct::RCTTypeFull)
-		{
+		if (rv.type == rct::RCTTypeFull) {
 			decoded_amount = rct::decodeRct(rv, rct::sk2rct(scalar), index, mask, hw::get_device("default"));
-		}
-		else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG || rv.type == rct::RCTTypeBulletproofPlus)
-		{
+		} else if (rv.type == rct::RCTTypeSimple || rv.type == rct::RCTTypeBulletproof || rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG || rv.type == rct::RCTTypeBulletproofPlus) {
 			decoded_amount = rct::decodeRctSimple(rv, rct::sk2rct(scalar), index, mask, hw::get_device("default"));
 		}
 
@@ -800,14 +729,12 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	std::vector<Utxo> utxos;
 
 	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-	if (!crypto::generate_key_derivation(tx.pub, account_keys.m_view_secret_key, derivation))
-	{
+	if (!crypto::generate_key_derivation(tx.pub, account_keys.m_view_secret_key, derivation)) {
 		return utxos;
 	}
 
 	std::vector<crypto::key_derivation> additional_derivations;
-	for (const auto &pub : tx.additional_pubs)
-	{
+	for (const auto &pub : tx.additional_pubs) {
 		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
 
 		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, additional_derivation))
@@ -818,11 +745,9 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		additional_derivations.push_back(additional_derivation);
 	}
 
-	BOOST_FOREACH (auto &output, tx.outputs)
-	{
+	BOOST_FOREACH (auto &output, tx.outputs) {
 		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev);
-		if (!subaddr_recv_info)
-			continue;
+		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
 		utxo.tx_id = tx.id;
@@ -833,13 +758,11 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		utxo.pub = output.pub;
 		utxo.rv = serial_bridge::build_rct(tx.rv, output.index);
 
-		if (account_keys.m_spend_secret_key != crypto::null_skey)
-		{
+		if (account_keys.m_spend_secret_key != crypto::null_skey) {
 			cryptonote::keypair in_ephemeral;
 			crypto::key_image ki;
 
-			if (!generate_key_image_helper_precomp(account_keys, output.pub, subaddr_recv_info->derivation, output.index, subaddr_recv_info->index, in_ephemeral, ki, hwdev))
-			{
+			if(!generate_key_image_helper_precomp(account_keys, output.pub, subaddr_recv_info->derivation, output.index, subaddr_recv_info->index, in_ephemeral, ki, hwdev)) {
 				continue;
 			}
 
@@ -859,31 +782,26 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 	ExtractUtxosResponse response;
 
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		response.error = error_ret_json_from_message("Invalid JSON");
 		return response;
 	}
 
 	std::map<std::string, WalletAccountParamsBase> wallet_accounts_params;
-	for (const auto &params_desc : json_root.get_child("params_by_wallet_account"))
-	{
+	for (const auto& params_desc : json_root.get_child("params_by_wallet_account")) {
 		WalletAccountParamsBase wallet_account_params;
 
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key))
-		{
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
 			continue;
 		}
 
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key))
-		{
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key)) {
 			continue;
 		}
 
 		wallet_account_params.account_keys.m_spend_secret_key = crypto::null_skey;
 		auto secSpendKeyString = params_desc.second.get_optional<string>("sec_spendKey_string");
-		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key))
-		{
+		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key)) {
 			continue;
 		}
 
@@ -895,27 +813,21 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
 
-	for (const auto &pair : wallet_accounts_params)
-	{
+	for (const auto &pair : wallet_accounts_params) {
 		response.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractUtxosResult{}));
 	}
 
-	for (const auto &tx_desc : json_root.get_child("txs"))
-	{
+	for (const auto& tx_desc : json_root.get_child("txs")) {
 		assert(tx_desc.first.empty());
 
 		BridgeTransaction tx;
-		try
-		{
+		try {
 			tx = serial_bridge::json_to_tx(tx_desc.second);
-		}
-		catch (std::invalid_argument err)
-		{
+		} catch(std::invalid_argument err) {
 			continue;
 		}
 
-		for (auto &pair : wallet_accounts_params)
-		{
+		for (auto& pair : wallet_accounts_params) {
 			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, pair.second.account_keys, pair.second.subaddresses);
 
 			auto &result = response.results_by_wallet_account[pair.first];
@@ -923,8 +835,8 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		}
 	}
 
-	for (const auto &pair : wallet_accounts_params)
-	{
+
+	for (const auto& pair : wallet_accounts_params) {
 		auto &result = response.results_by_wallet_account[pair.first];
 		result.subaddresses = pair.second.subaddresses.size();
 	}
@@ -932,10 +844,8 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 	return response;
 }
 
-void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index &tx_index, uint32_t lookahead)
-{
-	if (subaddresses.size() > (tx_index.minor + lookahead - 1))
-		return;
+void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses, const cryptonote::subaddress_index& tx_index, uint32_t lookahead) {
+	if (subaddresses.size() > (tx_index.minor + lookahead - 1)) return;
 
 	hw::device &hwdev = hw::get_device("default");
 
@@ -945,15 +855,13 @@ void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, s
 	cryptonote::subaddress_index index = {0, begin};
 
 	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, index.major, index.minor, end);
-	for (; index.minor < end; index.minor++)
-	{
+	for (; index.minor < end; index.minor++) {
 		const crypto::public_key &D = pkeys[index.minor - begin];
 		subaddresses[D] = index;
 	}
 }
 
-uint32_t serial_bridge::get_subaddress_clamped_sum(uint32_t idx, uint32_t extra)
-{
+uint32_t serial_bridge::get_subaddress_clamped_sum(uint32_t idx, uint32_t extra) {
 	static constexpr uint32_t uint32_max = std::numeric_limits<uint32_t>::max();
 	if (idx > uint32_max - extra)
 		return uint32_max;
@@ -963,35 +871,29 @@ uint32_t serial_bridge::get_subaddress_clamped_sum(uint32_t idx, uint32_t extra)
 //
 // Bridge Function Implementations
 //
-string serial_bridge::decode_address(const string &args_string)
-{
+string serial_bridge::decode_address(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	auto retVals = monero::address_utils::decodedAddress(json_root.get<string>("address"), nettype_from_string(json_root.get<string>("nettype_string")));
-	if (retVals.did_error)
-	{
+	if (retVals.did_error) {
 		return error_ret_json_from_message(*(retVals.err_string));
 	}
 	boost::property_tree::ptree root;
 	root.put(ret_json_key__isSubaddress(), retVals.isSubaddress);
 	root.put(ret_json_key__pub_viewKey_string(), *(retVals.pub_viewKey_string));
 	root.put(ret_json_key__pub_spendKey_string(), *(retVals.pub_spendKey_string));
-	if (retVals.paymentID_string != none)
-	{
+	if (retVals.paymentID_string != none) {
 		root.put(ret_json_key__paymentID_string(), *(retVals.paymentID_string));
 	}
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::is_subaddress(const string &args_string)
-{
+string serial_bridge::is_subaddress(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1001,11 +903,9 @@ string serial_bridge::is_subaddress(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::is_integrated_address(const string &args_string)
-{
+string serial_bridge::is_integrated_address(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1018,43 +918,36 @@ string serial_bridge::is_integrated_address(const string &args_string)
 string serial_bridge::new_integrated_address(const string &args_string)
 {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	optional<string> retVal = monero::address_utils::new_integratedAddrFromStdAddr(json_root.get<string>("address"), json_root.get<string>("short_pid"), nettype_from_string(json_root.get<string>("nettype_string")));
 	boost::property_tree::ptree root;
-	if (retVal != none)
-	{
+	if (retVal != none) {
 		root.put(ret_json_key__generic_retVal(), *retVal);
 	}
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::new_payment_id(const string &args_string)
-{
+string serial_bridge::new_payment_id(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	optional<string> retVal = monero_paymentID_utils::new_short_plain_paymentID_string();
 	boost::property_tree::ptree root;
-	if (retVal != none)
-	{
+	if (retVal != none) {
 		root.put(ret_json_key__generic_retVal(), *retVal);
 	}
 	//
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::newly_created_wallet(const string &args_string)
-{
+string serial_bridge::newly_created_wallet(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1064,8 +957,7 @@ string serial_bridge::newly_created_wallet(const string &args_string)
 		retVals,
 		nettype_from_string(json_root.get<string>("nettype_string")));
 	bool did_error = retVals.did_error;
-	if (!r)
-	{
+	if (!r) {
 		return error_ret_json_from_message(*(retVals.err_string));
 	}
 	THROW_WALLET_EXCEPTION_IF(did_error, error::wallet_internal_error, "Illegal success flag but did_error");
@@ -1084,23 +976,19 @@ string serial_bridge::newly_created_wallet(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::are_equal_mnemonics(const string &args_string)
-{
+string serial_bridge::are_equal_mnemonics(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	bool equal;
-	try
-	{
+	try {
 		equal = monero_wallet_utils::are_equal_mnemonics(
 			json_root.get<string>("a"),
 			json_root.get<string>("b"));
 	}
-	catch (std::exception const &e)
-	{
+	catch (std::exception const &e) {
 		return error_ret_json_from_message(e.what());
 	}
 	boost::property_tree::ptree root;
@@ -1108,11 +996,9 @@ string serial_bridge::are_equal_mnemonics(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::address_and_keys_from_seed(const string &args_string)
-{
+string serial_bridge::address_and_keys_from_seed(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1122,8 +1008,7 @@ string serial_bridge::address_and_keys_from_seed(const string &args_string)
 		nettype_from_string(json_root.get<string>("nettype_string")),
 		retVals);
 	bool did_error = retVals.did_error;
-	if (!r)
-	{
+	if (!r) {
 		return error_ret_json_from_message(*(retVals.err_string));
 	}
 	THROW_WALLET_EXCEPTION_IF(did_error, error::wallet_internal_error, "Illegal success flag but did_error");
@@ -1137,11 +1022,9 @@ string serial_bridge::address_and_keys_from_seed(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::mnemonic_from_seed(const string &args_string)
-{
+string serial_bridge::mnemonic_from_seed(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1149,8 +1032,7 @@ string serial_bridge::mnemonic_from_seed(const string &args_string)
 		json_root.get<string>("seed_string"),
 		json_root.get<string>("wordset_name"));
 	boost::property_tree::ptree root;
-	if (retVals.err_string != none)
-	{
+	if (retVals.err_string != none) {
 		return error_ret_json_from_message(*(retVals.err_string));
 	}
 	root.put(
@@ -1159,11 +1041,9 @@ string serial_bridge::mnemonic_from_seed(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::seed_and_keys_from_mnemonic(const string &args_string)
-{
+string serial_bridge::seed_and_keys_from_mnemonic(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1173,8 +1053,7 @@ string serial_bridge::seed_and_keys_from_mnemonic(const string &args_string)
 		retVals,
 		nettype_from_string(json_root.get<string>("nettype_string")));
 	bool did_error = retVals.did_error;
-	if (!r)
-	{
+	if (!r) {
 		return error_ret_json_from_message(*retVals.err_string);
 	}
 	monero_wallet_utils::WalletDescription walletDescription = *(retVals.optl__desc);
@@ -1191,11 +1070,9 @@ string serial_bridge::seed_and_keys_from_mnemonic(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::validate_components_for_login(const string &args_string)
-{
+string serial_bridge::validate_components_for_login(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1208,8 +1085,7 @@ string serial_bridge::validate_components_for_login(const string &args_string)
 		nettype_from_string(json_root.get<string>("nettype_string")),
 		retVals);
 	bool did_error = retVals.did_error;
-	if (!r)
-	{
+	if (!r) {
 		return error_ret_json_from_message(*retVals.err_string);
 	}
 	THROW_WALLET_EXCEPTION_IF(did_error, error::wallet_internal_error, "Illegal success flag but did_error");
@@ -1222,18 +1098,15 @@ string serial_bridge::validate_components_for_login(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::estimated_tx_network_fee(const string &args_string)
-{
+string serial_bridge::estimated_tx_network_fee(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	uint8_t fork_version = 0; // if missing
 	optional<string> optl__fork_version_string = json_root.get_optional<string>("fork_version");
-	if (optl__fork_version_string != none)
-	{
+	if (optl__fork_version_string != none) {
 		fork_version = stoul(*optl__fork_version_string);
 	}
 	uint64_t fee = monero_fee_utils::estimated_tx_network_fee(
@@ -1248,11 +1121,9 @@ string serial_bridge::estimated_tx_network_fee(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::estimate_fee(const string &args_string)
-{
+string serial_bridge::estimate_fee(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	//
@@ -1280,11 +1151,9 @@ string serial_bridge::estimate_fee(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::estimate_tx_weight(const string &args_string)
-{
+string serial_bridge::estimate_tx_weight(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	//
@@ -1305,11 +1174,9 @@ string serial_bridge::estimate_tx_weight(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::estimate_rct_tx_size(const string &args_string)
-{
+string serial_bridge::estimate_rct_tx_size(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
@@ -1329,19 +1196,16 @@ string serial_bridge::estimate_rct_tx_size(const string &args_string)
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::generate_key_image(const string &args_string)
-{
+string serial_bridge::generate_key_image(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	crypto::secret_key sec_viewKey{};
 	crypto::secret_key sec_spendKey{};
 	crypto::public_key pub_spendKey{};
-	crypto::public_key tx_pub_key{};
-	{
+	crypto::public_key tx_pub_key{}; {
 		bool r = false;
 		r = epee::string_tools::hex_to_pod(std::string(json_root.get<string>("sec_viewKey_string")), sec_viewKey);
 		THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Invalid secret view key");
@@ -1357,8 +1221,7 @@ string serial_bridge::generate_key_image(const string &args_string)
 		pub_spendKey, sec_spendKey, sec_viewKey, tx_pub_key,
 		stoull(json_root.get<string>("out_index")),
 		retVals);
-	if (!r)
-	{
+	if (!r) {
 		return error_ret_json_from_message("Unable to generate key image"); // TODO: return error string? (unwrap optional)
 	}
 	boost::property_tree::ptree root;
@@ -1367,18 +1230,15 @@ string serial_bridge::generate_key_image(const string &args_string)
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &args_string)
-{ // TODO: possibly allow this fn to take tx sec key as an arg, although, random bit gen is now handled well by emscripten
+string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &args_string) { // TODO: possibly allow this fn to take tx sec key as an arg, although, random bit gen is now handled well by emscripten
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	//
 	vector<SpendableOutput> unspent_outs;
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &output_desc, json_root.get_child("unspent_outs"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &output_desc, json_root.get_child("unspent_outs")) {
 		assert(output_desc.first.empty()); // array elements have no names
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
@@ -1396,14 +1256,12 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 	}
 	optional<string> optl__passedIn_attemptAt_fee_string = json_root.get_optional<string>("passedIn_attemptAt_fee");
 	optional<uint64_t> optl__passedIn_attemptAt_fee = none;
-	if (optl__passedIn_attemptAt_fee_string != none)
-	{
+	if (optl__passedIn_attemptAt_fee_string != none) {
 		optl__passedIn_attemptAt_fee = stoull(*optl__passedIn_attemptAt_fee_string);
 	}
 	uint8_t fork_version = 0; // if missing
 	optional<string> optl__fork_version_string = json_root.get_optional<string>("fork_version");
-	if (optl__fork_version_string != none)
-	{
+	if (optl__fork_version_string != none) {
 		fork_version = stoul(*optl__fork_version_string);
 	}
 	Send_Step1_RetVals retVals;
@@ -1422,8 +1280,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 		optl__passedIn_attemptAt_fee // use this for passing step2 "must-reconstruct" return values back in, i.e. re-entry; when nil, defaults to attempt at network min
 	);
 	boost::property_tree::ptree root;
-	if (retVals.errCode != noError)
-	{
+	if (retVals.errCode != noError) {
 		root.put(ret_json_key__any__err_code(), retVals.errCode);
 		root.put(ret_json_key__any__err_msg(), err_msg_from_err_code__create_transaction(retVals.errCode));
 		//
@@ -1431,8 +1288,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 		root.put(ret_json_key__send__spendable_balance(), RetVals_Transforms::str_from(retVals.spendable_balance));
 		root.put(ret_json_key__send__required_balance(), RetVals_Transforms::str_from(retVals.required_balance));
 	}
-	else
-	{
+	else {
 		root.put(ret_json_key__send__mixin(), RetVals_Transforms::str_from(retVals.mixin));
 		root.put(ret_json_key__send__using_fee(), RetVals_Transforms::str_from(retVals.using_fee));
 		root.put(ret_json_key__send__final_total_wo_fee(), RetVals_Transforms::str_from(retVals.final_total_wo_fee));
@@ -1461,8 +1317,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 }
 
 //
-string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_attempts(const string &args_string)
-{
+string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_attempts(const string &args_string) {
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
@@ -1470,8 +1325,7 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 	}
 	//
 	vector<SpendableOutput> using_outs;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, json_root.get_child("using_outs"))
-	{
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, json_root.get_child("using_outs")) {
 		assert(output_desc.first.empty()); // array elements have no names
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
@@ -1488,8 +1342,7 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 	}
 	//
 	vector<RandomAmountOutputs> mix_outs_from_server;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs"))
-	{
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs")) {
 		assert(mix_out_desc.first.empty()); // array elements have no names
 		auto amountAndOuts = RandomAmountOutputs{};
 		amountAndOuts.amount = stoull(mix_out_desc.second.get<string>("amount"));
@@ -1508,8 +1361,7 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 	optional<SpendableOutputToRandomAmountOutputs> optl__prior_attempt_unspent_outs_to_mix_outs;
 	SpendableOutputToRandomAmountOutputs prior_attempt_unspent_outs_to_mix_outs;
 	optional<boost::property_tree::ptree &> optl__prior_attempt_unspent_outs_to_mix_outs_json = json_root.get_child_optional("prior_attempt_unspent_outs_to_mix_outs");
-	if (optl__prior_attempt_unspent_outs_to_mix_outs_json != none)
-	{
+	if (optl__prior_attempt_unspent_outs_to_mix_outs_json != none) {
 		BOOST_FOREACH(boost::property_tree::ptree::value_type &outs_to_mix_outs_desc, *optl__prior_attempt_unspent_outs_to_mix_outs_json)
 		{
 			string out_pub_key = outs_to_mix_outs_desc.first;
@@ -1593,8 +1445,7 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::send_step2__try_create_transaction(const string &args_string)
-{
+string serial_bridge::send_step2__try_create_transaction(const string &args_string) {
 	boost::property_tree::ptree json_root;
 	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
@@ -1602,8 +1453,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 	}
 	//
 	vector<SpendableOutput> using_outs;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, json_root.get_child("using_outs"))
-	{
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &output_desc, json_root.get_child("using_outs")) {
 		assert(output_desc.first.empty()); // array elements have no names
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
@@ -1619,8 +1469,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		using_outs.push_back(std::move(out));
 	}
 	vector<RandomAmountOutputs> mix_outs;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs"))
-	{
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs")) {
 		assert(mix_out_desc.first.empty()); // array elements have no names
 		auto amountAndOuts = RandomAmountOutputs{};
 		amountAndOuts.amount = stoull(mix_out_desc.second.get<string>("amount"));
@@ -1680,17 +1529,14 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::decodeRct(const string &args_string)
-{
+string serial_bridge::decodeRct(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	rct::key sk;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sk"), sk))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sk"), sk)) {
 		return error_ret_json_from_message("Invalid 'sk'");
 	}
 	unsigned int i = stoul(json_root.get<string>("i"));
@@ -1699,40 +1545,31 @@ string serial_bridge::decodeRct(const string &args_string)
 	rct::rctSig rv = AUTO_VAL_INIT(rv);
 	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
 	// got to be a better way to do this
-	if (rv_type_int == rct::RCTTypeNull)
-	{
+	if (rv_type_int == rct::RCTTypeNull) {
 		rv.type = rct::RCTTypeNull;
 	}
-	else if (rv_type_int == rct::RCTTypeSimple)
-	{
+	else if (rv_type_int == rct::RCTTypeSimple) {
 		rv.type = rct::RCTTypeSimple;
 	}
-	else if (rv_type_int == rct::RCTTypeFull)
-	{
+	else if (rv_type_int == rct::RCTTypeFull) {
 		rv.type = rct::RCTTypeFull;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproof)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproof) {
 		rv.type = rct::RCTTypeBulletproof;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproof2)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		rv.type = rct::RCTTypeBulletproof2;
 	}
-	else if (rv_type_int == rct::RCTTypeCLSAG)
-	{
+	else if (rv_type_int == rct::RCTTypeCLSAG) {
 		rv.type = rct::RCTTypeCLSAG;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproofPlus)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
 		rv.type = rct::RCTTypeBulletproofPlus;
 	}
-	else
-	{
+	else {
 		return error_ret_json_from_message("Invalid 'rv.type'");
 	}
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo")) {
 		assert(ecdh_info_desc.first.empty()); // array elements have no names
 		auto ecdh_info = rct::ecdhTuple{};
 		if (!epee::string_tools::hex_to_pod(ecdh_info_desc.second.get<string>("mask"), ecdh_info.mask))
@@ -1745,8 +1582,7 @@ string serial_bridge::decodeRct(const string &args_string)
 		}
 		rv.ecdhInfo.push_back(ecdh_info); // rct keys aren't movable
 	}
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk")) {
 		assert(outPk_desc.first.empty()); // array elements have no names
 		auto outPk = rct::ctkey{};
 		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask))
@@ -1759,15 +1595,13 @@ string serial_bridge::decodeRct(const string &args_string)
 	//
 	rct::key mask;
 	rct::xmr_amount /*uint64_t*/ decoded_amount;
-	try
-	{
+	try {
 		decoded_amount = rct::decodeRct(
 			rv, sk, i, mask,
 			hw::get_device("default") // presently this uses the default device but we could let a string be passed to switch the type
 		);
 	}
-	catch (std::exception const &e)
-	{
+	catch (std::exception const &e) {
 		return error_ret_json_from_message(e.what());
 	}
 	ostringstream decoded_amount_ss;
@@ -1780,17 +1614,14 @@ string serial_bridge::decodeRct(const string &args_string)
 	return ret_json_from_root(root);
 }
 //
-string serial_bridge::decodeRctSimple(const string &args_string)
-{
+string serial_bridge::decodeRctSimple(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	rct::key sk;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sk"), sk))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sk"), sk)) {
 		return error_ret_json_from_message("Invalid 'sk'");
 	}
 	unsigned int i = stoul(json_root.get<string>("i"));
@@ -1799,40 +1630,31 @@ string serial_bridge::decodeRctSimple(const string &args_string)
 	rct::rctSig rv = AUTO_VAL_INIT(rv);
 	unsigned int rv_type_int = stoul(rv_desc.get<string>("type"));
 	// got to be a better way to do this
-	if (rv_type_int == rct::RCTTypeNull)
-	{
+	if (rv_type_int == rct::RCTTypeNull) {
 		rv.type = rct::RCTTypeNull;
 	}
-	else if (rv_type_int == rct::RCTTypeSimple)
-	{
+	else if (rv_type_int == rct::RCTTypeSimple) {
 		rv.type = rct::RCTTypeSimple;
 	}
-	else if (rv_type_int == rct::RCTTypeFull)
-	{
+	else if (rv_type_int == rct::RCTTypeFull) {
 		rv.type = rct::RCTTypeFull;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproof)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproof) {
 		rv.type = rct::RCTTypeBulletproof;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproof2)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproof2) {
 		rv.type = rct::RCTTypeBulletproof2;
 	}
-	else if (rv_type_int == rct::RCTTypeCLSAG)
-	{
+	else if (rv_type_int == rct::RCTTypeCLSAG) {
 		rv.type = rct::RCTTypeCLSAG;
 	}
-	else if (rv_type_int == rct::RCTTypeBulletproofPlus)
-	{
+	else if (rv_type_int == rct::RCTTypeBulletproofPlus) {
 		rv.type = rct::RCTTypeBulletproofPlus;
 	}
-	else
-	{
+	else {
 		return error_ret_json_from_message("Invalid 'rv.type'");
 	}
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &ecdh_info_desc, rv_desc.get_child("ecdhInfo")) {
 		assert(ecdh_info_desc.first.empty()); // array elements have no names
 		auto ecdh_info = rct::ecdhTuple{};
 		if (rv.type == rct::RCTTypeBulletproof2 || rv.type == rct::RCTTypeCLSAG || rv.type == rct::RCTTypeBulletproofPlus)
@@ -1855,8 +1677,7 @@ string serial_bridge::decodeRctSimple(const string &args_string)
 		}
 		rv.ecdhInfo.push_back(ecdh_info);
 	}
-	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk"))
-	{
+	BOOST_FOREACH (boost::property_tree::ptree::value_type &outPk_desc, rv_desc.get_child("outPk")) {
 		assert(outPk_desc.first.empty()); // array elements have no names
 		auto outPk = rct::ctkey{};
 		if (!epee::string_tools::hex_to_pod(outPk_desc.second.get<string>("mask"), outPk.mask))
@@ -1869,15 +1690,13 @@ string serial_bridge::decodeRctSimple(const string &args_string)
 	//
 	rct::key mask;
 	rct::xmr_amount /*uint64_t*/ decoded_amount;
-	try
-	{
+	try {
 		decoded_amount = rct::decodeRctSimple(
 			rv, sk, i, mask,
 			hw::get_device("default") // presently this uses the default device but we could let a string be passed to switch the type
 		);
 	}
-	catch (std::exception const &e)
-	{
+	catch (std::exception const &e) {
 		return error_ret_json_from_message(e.what());
 	}
 	stringstream decoded_amount_ss;
@@ -1889,27 +1708,22 @@ string serial_bridge::decodeRctSimple(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::generate_key_derivation(const string &args_string)
-{
+string serial_bridge::generate_key_derivation(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	public_key pub_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub"), pub_key))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub"), pub_key)) {
 		return error_ret_json_from_message("Invalid 'pub'");
 	}
 	secret_key sec_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec"), sec_key))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("sec"), sec_key)) {
 		return error_ret_json_from_message("Invalid 'sec'");
 	}
 	crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-	if (!crypto::generate_key_derivation(pub_key, sec_key, derivation))
-	{
+	if (!crypto::generate_key_derivation(pub_key, sec_key, derivation)) {
 		return error_ret_json_from_message("Unable to generate key derivation");
 	}
 	boost::property_tree::ptree root;
@@ -1917,28 +1731,23 @@ string serial_bridge::generate_key_derivation(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::derive_public_key(const string &args_string)
-{
+string serial_bridge::derive_public_key(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	crypto::key_derivation derivation;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation)) {
 		return error_ret_json_from_message("Invalid 'derivation'");
 	}
 	std::size_t output_index = stoul(json_root.get<string>("out_index"));
 	crypto::public_key base;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub"), base))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("pub"), base)) {
 		return error_ret_json_from_message("Invalid 'pub'");
 	}
 	crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
-	if (!crypto::derive_public_key(derivation, output_index, base, derived_key))
-	{
+	if (!crypto::derive_public_key(derivation, output_index, base, derived_key)) {
 		return error_ret_json_from_message("Unable to derive public key");
 	}
 	boost::property_tree::ptree root;
@@ -1946,28 +1755,23 @@ string serial_bridge::derive_public_key(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::derive_subaddress_public_key(const string &args_string)
-{
+string serial_bridge::derive_subaddress_public_key(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	crypto::key_derivation derivation;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation)) {
 		return error_ret_json_from_message("Invalid 'derivation'");
 	}
 	std::size_t output_index = stoul(json_root.get<string>("out_index"));
 	crypto::public_key out_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("output_key"), out_key))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("output_key"), out_key)) {
 		return error_ret_json_from_message("Invalid 'output_key'");
 	}
 	crypto::public_key derived_key = AUTO_VAL_INIT(derived_key);
-	if (!crypto::derive_subaddress_public_key(out_key, derivation, output_index, derived_key))
-	{
+	if (!crypto::derive_subaddress_public_key(out_key, derivation, output_index, derived_key)) {
 		return error_ret_json_from_message("Unable to derive public key");
 	}
 	boost::property_tree::ptree root;
@@ -1975,17 +1779,14 @@ string serial_bridge::derive_subaddress_public_key(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::derivation_to_scalar(const string &args_string)
-{
+string serial_bridge::derivation_to_scalar(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	crypto::key_derivation derivation;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("derivation"), derivation)) {
 		return error_ret_json_from_message("Invalid 'derivation'");
 	}
 	std::size_t output_index = stoul(json_root.get<string>("output_index"));
@@ -1996,27 +1797,22 @@ string serial_bridge::derivation_to_scalar(const string &args_string)
 	//
 	return ret_json_from_root(root);
 }
-string serial_bridge::encrypt_payment_id(const string &args_string)
-{
+string serial_bridge::encrypt_payment_id(const string &args_string) {
 	boost::property_tree::ptree json_root;
-	if (!parsed_json_root(args_string, json_root))
-	{
+	if (!parsed_json_root(args_string, json_root)) {
 		// it will already have thrown an exception
 		return error_ret_json_from_message("Invalid JSON");
 	}
 	crypto::hash8 payment_id;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("payment_id"), payment_id))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("payment_id"), payment_id)) {
 		return error_ret_json_from_message("Invalid 'payment_id'");
 	}
 	crypto::public_key public_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("public_key"), public_key))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("public_key"), public_key)) {
 		return error_ret_json_from_message("Invalid 'public_key'");
 	}
 	crypto::secret_key secret_key;
-	if (!epee::string_tools::hex_to_pod(json_root.get<string>("secret_key"), secret_key))
-	{
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("secret_key"), secret_key)) {
 		return error_ret_json_from_message("Invalid 'secret_key'");
 	}
 	hw::device &hwdev = hw::get_device("default");
@@ -2025,8 +1821,7 @@ string serial_bridge::encrypt_payment_id(const string &args_string)
 	root.put(ret_json_key__generic_retVal(), epee::string_tools::pod_to_hex(payment_id));
 	return ret_json_from_root(root);
 }
-string serial_bridge::extract_utxos(const string &args_string)
-{
+string serial_bridge::extract_utxos(const string &args_string) {
 	auto response = serial_bridge::extract_utxos_raw(args_string);
 
 	if (!response.error.empty())
@@ -2034,8 +1829,7 @@ string serial_bridge::extract_utxos(const string &args_string)
 
 	boost::property_tree::ptree root;
 	boost::property_tree::ptree results_tree;
-	for (const auto &pair : response.results_by_wallet_account)
-	{
+	for (const auto &pair : response.results_by_wallet_account) {
 		boost::property_tree::ptree wallet_tree;
 		wallet_tree.add_child("outputs", serial_bridge::utxos_to_json(pair.second.utxos));
 		wallet_tree.put("subaddresses", pair.second.subaddresses);
