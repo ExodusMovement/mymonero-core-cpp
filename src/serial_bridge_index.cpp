@@ -101,34 +101,28 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	uint64_t size = json_root.get<uint64_t>("size");
 
 	std::map<std::string, WalletAccountParams> wallet_accounts_params;
-	for (const auto &params_desc : json_root.get_child("params_by_wallet_account"))
-	{
+	for (const auto &params_desc : json_root.get_child("params_by_wallet_account")) {
 		WalletAccountParams wallet_account_params;
 
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key))
-		{
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
 			continue;
 		}
 
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key))
-		{
+		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key)) {
 			continue;
 		}
 
 		wallet_account_params.account_keys.m_spend_secret_key = crypto::null_skey;
 		auto secSpendKeyString = params_desc.second.get_optional<string>("sec_spendKey_string");
-		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key))
-		{
+		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key)) {
 			continue;
 		}
 
 		auto send_txs_child = params_desc.second.get_child_optional("send_txs");
-		if (send_txs_child)
-		{
+		if (send_txs_child) {
 			wallet_account_params.has_send_txs = true;
 
-			for (const auto &send_tx_desc : *send_txs_child)
-			{
+			for (const auto &send_tx_desc : *send_txs_child) {
 				assert(send_tx_desc.first.empty());
 
 				wallet_account_params.send_txs.insert(std::pair<std::string, bool>(send_tx_desc.second.get_value<std::string>(), true));
@@ -152,16 +146,14 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
 	}
 
-	for (const auto &pair : wallet_accounts_params)
-	{
+	for (const auto &pair : wallet_accounts_params) {
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
 
 	std::string m_body(buffer, length);
 
 	cryptonote::COMMAND_RPC_GET_BLOCKS_FAST::response resp;
-	if (!epee::serialization::load_t_from_binary(resp, m_body))
-	{
+	if (!epee::serialization::load_t_from_binary(resp, m_body)) {
 		native_resp.error = "Network request failed";
 		return native_resp;
 	}
@@ -175,14 +167,12 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 		cryptonote::block b;
 
 		crypto::hash block_hash;
-		if (!parse_and_validate_block_from_blob(block_entry.block, b, block_hash))
-		{
+		if (!parse_and_validate_block_from_blob(block_entry.block, b, block_hash)) {
 			continue;
 		}
 
 		auto gen_tx = b.miner_tx.vin[0];
-		if (gen_tx.type() != typeid(cryptonote::txin_gen))
-		{
+		if (gen_tx.type() != typeid(cryptonote::txin_gen)) {
 			continue;
 		}
 
@@ -191,8 +181,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 		pruned_block.block_height = height;
 		pruned_block.timestamp = b.timestamp;
-		for (size_t j = 0; j < block_entry.txs.size(); j++)
-		{
+		for (size_t j = 0; j < block_entry.txs.size(); j++) {
 			auto tx_entry = block_entry.txs[j];
 
 			cryptonote::transaction tx;
@@ -332,8 +321,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 			tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
 
 			boost::property_tree::ptree additional_pubs_tree;
-			for (const auto &pub : tx.additional_pubs)
-			{
+			for (const auto& pub : tx.additional_pubs) {
 				boost::property_tree::ptree value;
 				value.put("", epee::string_tools::pod_to_hex(pub));
 
@@ -343,12 +331,10 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 
 			tx_tree.put("fee", tx.fee_amount);
 
-			if (tx.payment_id8 != crypto::null_hash8)
-			{
+			if (tx.payment_id8 != crypto::null_hash8) {
 				tx_tree.put("epid", epee::string_tools::pod_to_hex(tx.payment_id8));
 			}
-			else if (tx.payment_id != crypto::null_hash)
-			{
+			else if (tx.payment_id != crypto::null_hash) {
 				tx_tree.put("pid", epee::string_tools::pod_to_hex(tx.payment_id));
 			}
 
@@ -1244,8 +1230,7 @@ string serial_bridge::send_step1__prepare_params_for_get_decoys(const string &ar
 		out.amount = stoull(output_desc.second.get<string>("amount"));
 		out.public_key = output_desc.second.get<string>("public_key");
 		out.rct = output_desc.second.get_optional<string>("rct");
-		if (out.rct != none && (*out.rct).empty() == true)
-		{
+		if (out.rct != none && (*out.rct).empty() == true) {
 			out.rct = none; // just in case it's an empty string, send to 'none' (even though receiving code now handles empty strs)
 		}
 		out.global_index = stoull(output_desc.second.get<string>("global_index"));
@@ -1329,6 +1314,7 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
 		out.public_key = output_desc.second.get<string>("public_key");
+		out.mask = output_desc.second.get<string>("mask");
 		out.rct = output_desc.second.get_optional<string>("rct");
 		if (out.rct != none && (*out.rct).empty() == true) {
 			out.rct = none; // just in case it's an empty string, send to 'none' (even though receiving code now handles empty strs)
@@ -1457,6 +1443,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		SpendableOutput out{};
 		out.amount = stoull(output_desc.second.get<string>("amount"));
 		out.public_key = output_desc.second.get<string>("public_key");
+		out.mask = output_desc.second.get<string>("mask");
 		out.rct = output_desc.second.get_optional<string>("rct");
 		if (out.rct != none && (*out.rct).empty() == true) {
 			out.rct = none; // send to 'none' if empty str for safety
@@ -1464,11 +1451,18 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		out.global_index = stoull(output_desc.second.get<string>("global_index"));
 		out.index = stoull(output_desc.second.get<string>("index"));
 		out.tx_pub_key = output_desc.second.get<string>("tx_pub_key");
+
+		for (const auto& additional_pub_desc : output_desc.second.get_child("additional_tx_pubs")) {
+			assert(additional_pub_desc.first.empty());
+
+			out.additional_tx_pubs.push_back(additional_pub_desc.second.get_value<std::string>());
+		}
 		//
 		using_outs.push_back(std::move(out));
 	}
 	vector<RandomAmountOutputs> mix_outs;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs")) {
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs"))
+	{
 		assert(mix_out_desc.first.empty()); // array elements have no names
 		auto amountAndOuts = RandomAmountOutputs{};
 		amountAndOuts.amount = stoull(mix_out_desc.second.get<string>("amount"));

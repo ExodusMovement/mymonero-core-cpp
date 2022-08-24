@@ -650,6 +650,17 @@ void monero_transfer_utils::create_transaction(
 		src.real_out_tx_key = tx_pub_key;
 		//
 		src.real_out_additional_tx_keys = get_additional_tx_pub_keys_from_extra(extra);
+
+		for (const auto& additional_pub_str : outputs[out_index].additional_tx_pubs) {
+			crypto::public_key additional_pub;
+			if (!epee::string_tools::hex_to_pod(additional_pub_str, additional_pub)) {
+				retVals.errCode = givenAnInvalidPubKey;
+				return;
+			}
+
+			src.real_out_additional_tx_keys.push_back(additional_pub);
+		}
+
 		//
 		src.real_output = real_output_index;
 		uint64_t internal_output_index = outputs[out_index].index;
@@ -657,19 +668,26 @@ void monero_transfer_utils::create_transaction(
 		//
 		src.rct = outputs[out_index].rct != boost::none && (*(outputs[out_index].rct)).empty() == false;
 		if (src.rct) {
-			rct::key decrypted_mask;
-			bool r = _rct_hex_to_decrypted_mask(
-				*(outputs[out_index].rct),
-				sender_account_keys.m_view_secret_key,
-				tx_pub_key,
-				internal_output_index,
-				decrypted_mask
-			);
-			if (!r) {
-				retVals.errCode = cantGetDecryptedMaskFromRCTHex;
-				return;
+			if (!outputs[out_index].mask.empty()) {
+				if (!string_tools::hex_to_pod(outputs[out_index].mask, src.mask)) {
+					retVals.errCode = mixRCTOutsMissingCommit;
+					return;
+				}
+			} else {
+				rct::key decrypted_mask;
+				bool r = _rct_hex_to_decrypted_mask(
+					*(outputs[out_index].rct),
+					sender_account_keys.m_view_secret_key,
+					tx_pub_key,
+					internal_output_index,
+					decrypted_mask
+				);
+				if (!r) {
+					retVals.errCode = cantGetDecryptedMaskFromRCTHex;
+					return;
+				}
+				src.mask = decrypted_mask;
 			}
-			src.mask = decrypted_mask;
 //			rct::key calculated_commit = rct::commit(outputs[out_index].amount, decrypted_mask);
 //			rct::key parsed_commit;
 //			_rct_hex_to_rct_commit(*(outputs[out_index].rct), parsed_commit);
