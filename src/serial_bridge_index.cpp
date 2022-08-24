@@ -1322,6 +1322,12 @@ string serial_bridge::pre_step2_tie_unspent_outs_to_mix_outs_for_all_future_tx_a
 		out.global_index = stoull(output_desc.second.get<string>("global_index"));
 		out.index = stoull(output_desc.second.get<string>("index"));
 		out.tx_pub_key = output_desc.second.get<string>("tx_pub_key");
+
+		for (const auto& additional_pub_desc : output_desc.second.get_child("additional_tx_pubs")) {
+			assert(additional_pub_desc.first.empty());
+
+			out.additional_tx_pubs.push_back(additional_pub_desc.second.get_value<std::string>());
+		}
 		//
 		using_outs.push_back(std::move(out));
 	}
@@ -1461,8 +1467,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		using_outs.push_back(std::move(out));
 	}
 	vector<RandomAmountOutputs> mix_outs;
-	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs"))
-	{
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &mix_out_desc, json_root.get_child("mix_outs")) {
 		assert(mix_out_desc.first.empty()); // array elements have no names
 		auto amountAndOuts = RandomAmountOutputs{};
 		amountAndOuts.amount = stoull(mix_out_desc.second.get<string>("amount"));
