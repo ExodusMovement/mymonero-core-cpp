@@ -447,6 +447,7 @@ void monero_transfer_utils::send_step2__try_create_transaction(
 	uint64_t fee_per_b, // per v8
 	uint64_t fee_quantization_mask,
 	vector<RandomAmountOutputs> &mix_outs, // cannot be const due to convenience__create_transaction's mutability requirement
+	uint32_t subaddresses_count,
 	use_fork_rules_fn_type use_fork_rules_fn,
 	uint64_t unlock_time, // or 0
 	cryptonote::network_type nettype
@@ -461,6 +462,7 @@ void monero_transfer_utils::send_step2__try_create_transaction(
 		to_address_string, payment_id_string,
 		final_total_wo_fee, change_amount, fee_amount,
 		using_outs, mix_outs,
+		subaddresses_count,
 		use_fork_rules_fn,
 		unlock_time,
 		nettype // TODO: move to after from_address_string
@@ -783,6 +785,7 @@ void monero_transfer_utils::convenience__create_transaction(
 	uint64_t fee_amount,
 	const vector<SpendableOutput> &outputs,
 	vector<RandomAmountOutputs> &mix_outs,
+	uint32_t subaddresses_count,
 	use_fork_rules_fn_type use_fork_rules_fn,
 	uint64_t unlock_time,
 	network_type nettype
@@ -846,7 +849,9 @@ void monero_transfer_utils::convenience__create_transaction(
 	//
 	uint32_t subaddr_account_idx = 0;
 	std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddresses;
-	subaddresses[account_keys.m_account_address.m_spend_public_key] = {0,0};
+	cryptonote::subaddress_index index = {0, 0};
+	serial_bridge::expand_subaddresses(account_keys, subaddresses, index, subaddresses_count);
+
 	//
 	TransactionConstruction_RetVals actualCall_retVals;
 	create_transaction(
