@@ -53,6 +53,11 @@ namespace monero_send_routine
 	using namespace cryptonote;
 	using namespace monero_transfer_utils;
 	using namespace crypto;
+
+	//
+	// Constants
+	static const uint32_t subaddresses_count = 200;
+	
 	//
 	// Abstracted Send routine
 	// - Accessory types - Callbacks - Data fetch hooks

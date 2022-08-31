@@ -426,7 +426,7 @@ void _reenterable_construct_and_send_tx(
 			args.fee_per_b,
 			args.fee_quantization_mask,
 			tie_outs_to_mix_outs_retVals.mix_outs,
-			200,
+			subaddresses_count,
 			std::move(use_fork_rules),
 			args.unlock_time,
 			args.nettype
