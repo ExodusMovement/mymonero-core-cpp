@@ -124,16 +124,12 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 
 			for (const auto &send_tx_desc : *send_txs_child) {
 				assert(send_tx_desc.first.empty());
-
 				wallet_account_params.send_txs.insert(std::pair<std::string, bool>(send_tx_desc.second.get_value<std::string>(), true));
 			}
 		}
-		else
-		{
-			for (const auto &image_desc : params_desc.second.get_child("key_images"))
-			{
+		else {
+			for (const auto &image_desc : params_desc.second.get_child("key_images")) {
 				assert(image_desc.first.empty());
-
 				wallet_account_params.gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
 			}
 		}
@@ -279,9 +275,11 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	}
 
 	for (const auto &pair : wallet_accounts_params) {
-		auto &result = native_resp.results_by_wallet_account[pair.first];
-
+		Result result;
 		result.subaddresses = pair.second.subaddresses.size();
+		result.txs = pair.second.txs;
+
+		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, result));
 	}
 
 	native_resp.current_height = resp.current_height;
@@ -311,8 +309,7 @@ std::string serial_bridge::extract_data_from_blocks_response_str(const char *buf
 	boost::property_tree::ptree results_tree;
 	for (const auto &pair : resp.results_by_wallet_account) {
 		boost::property_tree::ptree txs_tree;
-		for (const auto &tx : pair.second.txs)
-		{
+		for (const auto &tx : pair.second.txs) {
 			boost::property_tree::ptree tx_tree;
 
 			tx_tree.put("id", tx.id);
