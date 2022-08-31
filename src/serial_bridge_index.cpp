@@ -274,12 +274,10 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 #endif
 	}
 
-	for (const auto &pair : wallet_accounts_params) {
-		Result result;
-		result.subaddresses = pair.second.subaddresses.size();
-		result.txs = pair.second.txs;
+	for (const auto& pair : wallet_accounts_params) {
+		auto &result = native_resp.results_by_wallet_account[pair.first];
 
-		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, result));
+		result.subaddresses = pair.second.subaddresses.size();
 	}
 
 	native_resp.current_height = resp.current_height;
