@@ -610,6 +610,7 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		}
 
 		output.amount = output_desc.second.get<string>("amount");
+		output.view_tag = output_desc.second.get<string>("view_tag");
 
 		tx.outputs.push_back(output);
 	}
@@ -726,8 +727,8 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		additional_derivations.push_back(additional_derivation);
 	}
 
-	BOOST_FOREACH (auto &output, tx.outputs) {
-		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev);
+	BOOST_FOREACH (Output &output, tx.outputs) {
+		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev, output.view_tag);
 		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
