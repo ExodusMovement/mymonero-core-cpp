@@ -603,12 +603,13 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 
 		output.amount = output_desc.second.get<string>("amount");
 
-	
+		crypto::view_tag view_tag = crypto::view_tag{};
 		auto viewTagString = output_desc.second.get_optional<string>("view_tag");
-		if (viewTagString && !epee::string_tools::hex_to_pod(*viewTagString, output.view_tag)) {
-			throw std::invalid_argument("Invalid 'tx_desc.outputs.view_tag'");
+		if (viewTagString) {
+			bool r = epee::string_tools::hex_to_pod(std::string(*viewTagString), view_tag);
+			THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Invalid 'tx_desc.outputs.view_tag'");
 		}
-
+		output.view_tag = view_tag;
 		tx.outputs.push_back(output);
 	}
 
