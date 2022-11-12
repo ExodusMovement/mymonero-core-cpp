@@ -465,16 +465,8 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 		Output output;
 		output.index = i;
 		output.amount = std::to_string(tx_out.amount);
-
-		if (tx_out.target.type() == typeid(cryptonote::txout_to_key)) {
-			const auto &target = boost::get<cryptonote::txout_to_key>(tx_out.target);
-			output.pub = target.key;
-		} else if (tx_out.target.type() == typeid(cryptonote::txout_to_tagged_key)) {
-			const auto &target = boost::get<cryptonote::txout_to_tagged_key>(tx_out.target);
-			output.pub = target.key;
-		} else {
-			continue;
-		}
+		crypto::public_key output_public_key;
+		if (!cryptonote::get_output_public_key(tx_out, output_public_key)) continue;
 		output.view_tag = cryptonote::get_output_view_tag(tx_out);
 		outputs.push_back(output);
 	}
@@ -611,7 +603,11 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 
 		output.amount = output_desc.second.get<string>("amount");
 
-		epee::string_tools::hex_to_pod(output_desc.second.get<string>("view_tag"), output.view_tag);
+	
+		auto viewTagString = output_desc.second.get<string>("view_tag");
+		if (viewTagString && !epee::string_tools::hex_to_pod(viewTagString, output.view_tag)) {
+			throw std::invalid_argument("Invalid 'tx_desc.outputs.view_tag'");
+		}
 
 		tx.outputs.push_back(output);
 	}
