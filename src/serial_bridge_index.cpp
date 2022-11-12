@@ -604,8 +604,8 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		output.amount = output_desc.second.get<string>("amount");
 
 	
-		auto viewTagString = output_desc.second.get<string>("view_tag");
-		if (!viewTagString.empty() && !epee::string_tools::hex_to_pod(viewTagString, output.view_tag)) {
+		auto viewTagString = output_desc.second.get_optional<string>("view_tag");
+		if (viewTagString && !epee::string_tools::hex_to_pod(*viewTagString, output.view_tag)) {
 			throw std::invalid_argument("Invalid 'tx_desc.outputs.view_tag'");
 		}
 
