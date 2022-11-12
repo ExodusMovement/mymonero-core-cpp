@@ -610,7 +610,8 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		}
 
 		output.amount = output_desc.second.get<string>("amount");
-		output.view_tag = output_desc.second.get<string>("view_tag");
+
+		epee::string_tools::hex_to_pod(output_desc.second.get<string>("view_tag"), output.view_tag);
 
 		tx.outputs.push_back(output);
 	}
