@@ -830,13 +830,9 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		}
 	};
 
-	// for (const auto& tx : txes) {
-    //   if (tx.block_height > 2688888)
-    //     geniods.push_back(geniod_params{ tx });
-    //   else
-    //     tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
-    // }
-	tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
+	for (const auto& tx : txes) {
+        tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
+    }
 
 	// View tags significantly speed up the geniod function that determines if an output belongs to the account.
 	// Because the speedup is so large, the overhead from submitting individual geniods to the thread pool eats into
