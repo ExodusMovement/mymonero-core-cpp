@@ -818,8 +818,6 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 	{
 		const BridgeTransaction &tx;
 	};
- 	std::vector<geniod_params> geniods;
-	geniods.reserve(txes.size());
 
 	auto geniod = [&](const BridgeTransaction &tx) {
 		for (auto& pair : wallet_accounts_params) {
@@ -834,29 +832,6 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
         tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
     }
 
-	// View tags significantly speed up the geniod function that determines if an output belongs to the account.
-	// Because the speedup is so large, the overhead from submitting individual geniods to the thread pool eats into
-	// the benefit of executing in parallel. So to maximize the benefit from threads when view tags are enabled,
-	// the wallet starts submitting geniod function calls to the thread pool in batches of size GENIOD_BATCH_SIZE.
-	// if (geniods.size()) {
-	// 	size_t GENIOD_BATCH_SIZE = 100;
-	// 	size_t num_batch_txes = 0;
-	// 	size_t batch_start = 0;
-
-	// 	while (batch_start < geniods.size()) {
-	// 		size_t batch_end = std::min(batch_start + GENIOD_BATCH_SIZE, geniods.size());
-	// 		THROW_WALLET_EXCEPTION_IF(batch_end < batch_start, error::wallet_internal_error, "Thread batch end overflow");
-	// 		tpool.submit(&waiter, [&geniods, &geniod, batch_start, batch_end]() {
-	// 			for (size_t i = batch_start; i < batch_end; ++i) {
-	// 				const geniod_params &gp = geniods[i];
-	// 				geniod(gp.tx);
-	// 			}
-	// 		}, true);
-	// 		num_batch_txes += batch_end - batch_start;
-	// 		batch_start = batch_end;
-	// 	}
-	// 	THROW_WALLET_EXCEPTION_IF(num_batch_txes != geniods.size(), error::wallet_internal_error, "txes batched for thread pool did not reach expected value");
-	// }
 	THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
 
 	for (const auto& pair : wallet_accounts_params) {
