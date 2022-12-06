@@ -799,19 +799,6 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		response.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractUtxosResult{}));
 	}
 
-	std::vector<BridgeTransaction> txes;
-	for (const auto& tx_desc : json_root.get_child("txs")) {
-		assert(tx_desc.first.empty());
-
-		BridgeTransaction tx;
-		try {
-			tx = serial_bridge::json_to_tx(tx_desc.second);
-			txes.push_back(tx);
-		} catch(std::invalid_argument err) {
-			continue;
-		}
-	}
-
 	tools::threadpool& tpool = tools::threadpool::getInstance();
   	tools::threadpool::waiter waiter(tpool);
 	struct geniod_params
@@ -828,9 +815,19 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		}
 	};
 
-	for (const auto& tx : txes) {
-        tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
-    }
+	for (const auto& tx_desc : json_root.get_child("txs")) {
+		assert(tx_desc.first.empty());
+
+		BridgeTransaction tx;
+		try {
+			tx = serial_bridge::json_to_tx(tx_desc.second);
+
+			// submitting geniod function calls to the thread pool
+			tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
+		} catch(std::invalid_argument err) {
+			continue;
+		}
+	}
 
 	THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
 
