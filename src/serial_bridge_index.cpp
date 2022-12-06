@@ -523,8 +523,12 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 	BridgeTransaction tx;
 
 	tx.id = tx_desc.get<string>("id");
-	tx.block_height = tx_desc.get<uint64_t>("block_height");
 
+	optional<string> str = tx_desc.get_optional<string>("pub");
+	if (str == none) {
+		throw std::invalid_argument("Missing 'tx_desc.pub'");
+	}
+	
 	if (!epee::string_tools::hex_to_pod(tx_desc.get<string>("pub"), tx.pub)) {
 		throw std::invalid_argument("Invalid 'tx_desc.pub'");
 	}
