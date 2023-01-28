@@ -468,6 +468,7 @@ std::vector<Output> serial_bridge::get_outputs(const cryptonote::transaction &tx
 		output.amount = std::to_string(tx_out.amount);
 		crypto::public_key output_public_key;
 		if (!cryptonote::get_output_public_key(tx_out, output_public_key)) continue;
+		output.pub = output_public_key;
 		output.view_tag = cryptonote::get_output_view_tag(tx_out);
 		outputs.push_back(output);
 	}
@@ -614,8 +615,8 @@ BridgeTransaction serial_bridge::json_to_tx(boost::property_tree::ptree tx_desc)
 		if (viewTagString) {
 			bool r = epee::string_tools::hex_to_pod(std::string(*viewTagString), view_tag);
 			THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Invalid 'tx_desc.outputs.view_tag'");
+			output.view_tag = view_tag;
 		}
-		output.view_tag = view_tag;
 		tx.outputs.push_back(output);
 	}
 
