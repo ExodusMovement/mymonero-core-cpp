@@ -239,6 +239,7 @@ namespace monero_send_routine
 		uint64_t sending_amount;
 		bool is_sweeping;
 		uint32_t simple_priority;
+		vector<uint64_t> fees;
 		send__get_unspent_outs_fn_type get_unspent_outs_fn;
 		send__get_random_outs_fn_type get_random_outs_fn;
 		send__submit_raw_tx_fn_type submit_raw_tx_fn;

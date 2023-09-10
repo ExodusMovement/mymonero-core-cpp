@@ -317,6 +317,7 @@ struct _SendFunds_ConstructAndSendTx_Args
 	uint64_t sending_amount;
 	bool is_sweeping;
 	uint32_t simple_priority;
+	const vector<uint64_t> &fees;
 	const send__get_random_outs_fn_type &get_random_outs_fn;
 	const send__submit_raw_tx_fn_type &submit_raw_tx_fn;
 	const send__status_update_fn_type &status_update_fn;
@@ -422,6 +423,7 @@ void _reenterable_construct_and_send_tx(
 			step1_retVals.change_amount,
 			step1_retVals.using_fee,
 			args.simple_priority,
+			args.fees,
 			step1_retVals.using_outs,
 			args.fee_per_b,
 			args.fee_quantization_mask,
@@ -565,7 +567,7 @@ void monero_send_routine::async__send_funds(Async_SendFunds_Args args)
 		_reenterable_construct_and_send_tx(_SendFunds_ConstructAndSendTx_Args{
 			args.from_address_string, args.sec_viewKey_string, args.sec_spendKey_string,
 			args.to_address_string, args.payment_id_string, usable__sending_amount, args.is_sweeping, args.simple_priority,
-			args.get_random_outs_fn, args.submit_raw_tx_fn, args.status_update_fn, args.error_cb_fn, args.success_cb_fn,
+			args.fees, args.get_random_outs_fn, args.submit_raw_tx_fn, args.status_update_fn, args.error_cb_fn, args.success_cb_fn,
 			args.unlock_time == none ? 0 : *(args.unlock_time),
 			args.nettype == none ? MAINNET : *(args.nettype),
 			//
