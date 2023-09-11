@@ -1134,6 +1134,8 @@ string serial_bridge::estimate_fee(const string &args_string) {
 	int n_outputs = stoul(json_root.get<string>("n_outputs"));
 	size_t extra_size = stoul(json_root.get<string>("extra_size"));
 	bool bulletproof = json_root.get<bool>("bulletproof");
+	bool bulletproof_plus = json_root.get<bool>("bulletproof_plus");
+	uint64_t use_view_tags = json_root.get<bool>("use_view_tags");
 	uint64_t base_fee = stoull(json_root.get<string>("base_fee"));
 	uint64_t fee_quantization_mask = stoull(json_root.get<string>("fee_quantization_mask"));
 	uint32_t priority = stoul(json_root.get<string>("priority"));
@@ -1142,7 +1144,7 @@ string serial_bridge::estimate_fee(const string &args_string) {
 	bool clsag = use_fork_rules_fn(HF_VERSION_CLSAG, -10);
 	uint64_t fee_multiplier = monero_fee_utils::get_fee_multiplier(priority, monero_fee_utils::default_priority(), monero_fee_utils::get_fee_algorithm(use_fork_rules_fn), use_fork_rules_fn);
 	//
-	uint64_t fee = monero_fee_utils::estimate_fee(use_per_byte_fee, use_rct, n_inputs, mixin, n_outputs, extra_size, bulletproof, clsag, base_fee, fee_multiplier, fee_quantization_mask);
+	uint64_t fee = monero_fee_utils::estimate_fee(use_per_byte_fee, use_rct, n_inputs, mixin, n_outputs, extra_size, bulletproof, clsag, bulletproof_plus, use_view_tags, base_fee, fee_quantization_mask);
 	//
 	std::ostringstream o;
 	o << fee;
@@ -1164,8 +1166,10 @@ string serial_bridge::estimate_tx_weight(const string &args_string) {
 	size_t extra_size = stoul(json_root.get<string>("extra_size"));
 	bool bulletproof = json_root.get<bool>("bulletproof");
 	bool clsag = json_root.get<bool>("clsag");
+	bool bulletproof_plus = json_root.get<bool>("bulletproof_plus");
+	uint64_t use_view_tags = json_root.get<bool>("use_view_tags");
 	//
-	uint64_t weight = monero_fee_utils::estimate_tx_weight(use_rct, n_inputs, mixin, n_outputs, extra_size, bulletproof, clsag);
+	uint64_t weight = monero_fee_utils::estimate_tx_weight(use_rct, n_inputs, mixin, n_outputs, extra_size, bulletproof, clsag, bulletproof_plus, use_view_tags);
 	//
 	std::ostringstream o;
 	o << weight;
@@ -1186,7 +1190,9 @@ string serial_bridge::estimate_rct_tx_size(const string &args_string) {
 		stoul(json_root.get<string>("n_outputs")),
 		stoul(json_root.get<string>("extra_size")),
 		json_root.get<bool>("bulletproof"),
-		json_root.get<bool>("clsag"));
+		json_root.get<bool>("clsag"),
+		json_root.get<bool>("bulletproof_plus"),
+		json_root.get<bool>("use_view_tags"));
 	std::ostringstream o;
 	o << size;
 	//
@@ -1496,6 +1502,13 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		}
 		mix_outs.push_back(std::move(amountAndOuts));
 	}
+
+	vector<uint64_t> fees;
+	BOOST_FOREACH(boost::property_tree::ptree::value_type &fee_desc, json_root.get_child("fees")) {
+		assert(fee_desc.first.empty());
+		fees.push_back(fee_desc.second.get_value<uint64_t>());
+	}
+
 	uint8_t fork_version = 0; // if missing
 	optional<string> optl__fork_version_string = json_root.get_optional<string>("fork_version");
 	if (optl__fork_version_string != none) {
@@ -1514,6 +1527,7 @@ string serial_bridge::send_step2__try_create_transaction(const string &args_stri
 		stoull(json_root.get<string>("change_amount")),
 		stoull(json_root.get<string>("fee_amount")),
 		stoul(json_root.get<string>("priority")),
+		fees,
 		using_outs,
 		stoull(json_root.get<string>("fee_per_b")),
 		stoull(json_root.get<string>("fee_mask")),

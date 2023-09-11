@@ -253,6 +253,7 @@ namespace monero_transfer_utils
 		uint64_t change_amount,
 		uint64_t fee_amount,
 		uint32_t simple_priority,
+		const vector<uint64_t> &fees,
 		const vector<SpendableOutput> &using_outs,
 		uint64_t fee_per_b, // per v8
 		uint64_t fee_quantization_mask,
