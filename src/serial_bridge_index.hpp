@@ -34,6 +34,8 @@
 #define serial_bridge_index_hpp
 //
 #include <string>
+#include <stdexcept>
+#include <zlib.h>
 #include <boost/property_tree/ptree.hpp>
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "cryptonote_config.h"
@@ -75,6 +77,27 @@ namespace serial_bridge
 		std::string rv;
 		uint64_t global_index;
 		uint64_t block_height;
+	};
+
+	struct BlockHeader {
+		uint8_t major_version;
+		uint8_t minor_version;  // now used as a voting mechanism, rather than how this particular block is built
+		uint64_t timestamp;
+		crypto::hash  previous_block_hash;
+		uint32_t nonce;		
+	};
+
+	struct BlockData {
+		BlockHeader block_header;
+		std::vector<crypto::hash> transaction_hashes;
+	};
+
+	struct BridgeBlock {
+		uint64_t id; // block height
+		bool prune = true;
+		BlockData block;
+		std::vector<std::string> txs;
+		std::vector<std::vector<uint64_t>> outputIndices;
 	};
 
 	struct BridgeTransaction {
@@ -149,6 +172,7 @@ namespace serial_bridge
 	NativeResponse extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 	std::string get_transaction_pool_hashes_str(const char *buffer, size_t length);
+	std::string decompress(const char *buffer, size_t length);
 
 	//
 	// Helper Functions

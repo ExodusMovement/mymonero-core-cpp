@@ -86,6 +86,57 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	return (const char *)arr;
 }
 
+std::string serial_bridge::decompress(const char *buffer, size_t length) {
+    if (buffer == nullptr || length == 0) {
+        throw std::invalid_argument("Invalid input data");
+    }
+
+    int ret;
+    z_stream strm;
+	std::string decompressedData;
+    unsigned char outBuffer[32768];
+
+    // Initialize the decompression stream
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+	strm.avail_in = 0;
+	strm.total_out = 0;
+    strm.next_in = Z_NULL;
+	ret = inflateInit2(&strm, (16+MAX_WBITS)); // MAX_WBITS + 16 for gzip decoding
+    if (ret != Z_OK) {
+		throw std::runtime_error("inflateInit failed while decompressing.");
+	}
+
+    // Set the input data
+    strm.avail_in = length;
+    strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(buffer));
+
+    // Decompress until deflate stream ends or end of file
+    do {
+        strm.avail_out = sizeof(outBuffer);
+        strm.next_out = outBuffer;
+        ret = inflate(&strm, Z_NO_FLUSH);
+        switch (ret) {
+            case Z_NEED_DICT:
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                inflateEnd(&strm);
+                throw std::runtime_error("Decompression error");
+        }
+	
+        decompressedData.insert(decompressedData.end(), outBuffer, outBuffer + sizeof(outBuffer) - strm.avail_out);
+    } while (ret == Z_OK);
+
+    // Clean up the zlib stream
+    inflateEnd(&strm);
+    if (ret != Z_STREAM_END) {
+        throw std::runtime_error("Incomplete decompression: more data was expected");
+    }
+
+	return decompressedData;
+}
+
 NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
 	NativeResponse native_resp;
 
