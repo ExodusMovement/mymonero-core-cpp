@@ -170,6 +170,7 @@ namespace serial_bridge
 	// HTTP helpers
 	const char *create_blocks_request(int height, size_t *length);
 	NativeResponse extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
+    NativeResponse extract_data_from_clarity_blocks_response(const char *buffer, size_t length, const string &args_string);
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 	std::string get_transaction_pool_hashes_str(const char *buffer, size_t length);
 	std::string decompress(const char *buffer, size_t length);
@@ -190,6 +191,7 @@ namespace serial_bridge
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask);
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
+    std::map<std::string, WalletAccountParams> serial_bridge::json_to_wallet_accounts_params(boost::property_tree::ptree params_by_wallet_account);
 
 	ExtractUtxosResponse extract_utxos_raw(const string &args_string);
 
