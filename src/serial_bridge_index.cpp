@@ -508,7 +508,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 		result.subaddresses = pair.second.subaddresses.size();
 	}
 
-	native_resp.current_height = 0;
+	native_resp.current_height = 0; // clarity does not return it in the blocks API, we need to get it from monitor
 	native_resp.latest = latest;
 	native_resp.oldest = oldest;
 	native_resp.size = size;
@@ -518,65 +518,73 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 
 std::string serial_bridge::extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
 	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
+    return serial_bridge::native_response_to_json_str(resp);
+}
 
-	boost::property_tree::ptree root;
+std::string serial_bridge::extract_data_from_clarity_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
+    auto resp = serial_bridge::extract_data_from_clarity_blocks_response(buffer, length, args_string);
+    return serial_bridge::native_response_to_json_str(resp);
+}
 
-	if (!resp.error.empty()) {
-		root.put(ret_json_key__any__err_msg(), resp.error);
-		return ret_json_from_root(root);
-	}
+std::string serial_bridge::native_response_to_json_str(NativeResponse resp) {
+    boost::property_tree::ptree root;
 
-	root.put("current_height", resp.current_height);
-	root.put("end_height", resp.end_height);
-	root.put("latest", resp.latest);
-	root.put("oldest", resp.oldest);
-	root.put("size", resp.size);
+    if (!resp.error.empty()) {
+        root.put(ret_json_key__any__err_msg(), resp.error);
+        return ret_json_from_root(root);
+    }
 
-	boost::property_tree::ptree results_tree;
-	for (const auto &pair : resp.results_by_wallet_account) {
-		boost::property_tree::ptree txs_tree;
-		for (const auto &tx : pair.second.txs) {
-			boost::property_tree::ptree tx_tree;
+    root.put("current_height", resp.current_height);
+    root.put("end_height", resp.end_height);
+    root.put("latest", resp.latest);
+    root.put("oldest", resp.oldest);
+    root.put("size", resp.size);
 
-			tx_tree.put("id", tx.id);
-			tx_tree.put("timestamp", tx.timestamp);
-			tx_tree.put("height", tx.block_height);
-			tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
+    boost::property_tree::ptree results_tree;
+    for (const auto &pair : resp.results_by_wallet_account) {
+        boost::property_tree::ptree txs_tree;
+        for (const auto &tx : pair.second.txs) {
+            boost::property_tree::ptree tx_tree;
 
-			boost::property_tree::ptree additional_pubs_tree;
-			for (const auto& pub : tx.additional_pubs) {
-				boost::property_tree::ptree value;
-				value.put("", epee::string_tools::pod_to_hex(pub));
+            tx_tree.put("id", tx.id);
+            tx_tree.put("timestamp", tx.timestamp);
+            tx_tree.put("height", tx.block_height);
+            tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
 
-				additional_pubs_tree.push_back(std::make_pair("", value));
-			}
-			tx_tree.add_child("additional_pubs", additional_pubs_tree);
+            boost::property_tree::ptree additional_pubs_tree;
+            for (const auto& pub : tx.additional_pubs) {
+                boost::property_tree::ptree value;
+                value.put("", epee::string_tools::pod_to_hex(pub));
 
-			tx_tree.put("fee", tx.fee_amount);
+                additional_pubs_tree.push_back(std::make_pair("", value));
+            }
+            tx_tree.add_child("additional_pubs", additional_pubs_tree);
 
-			if (tx.payment_id8 != crypto::null_hash8) {
-				tx_tree.put("epid", epee::string_tools::pod_to_hex(tx.payment_id8));
-			}
-			else if (tx.payment_id != crypto::null_hash) {
-				tx_tree.put("pid", epee::string_tools::pod_to_hex(tx.payment_id));
-			}
+            tx_tree.put("fee", tx.fee_amount);
 
-			tx_tree.add_child("inputs", inputs_to_json(tx.inputs));
-			tx_tree.add_child("utxos", utxos_to_json(tx.utxos, true));
+            if (tx.payment_id8 != crypto::null_hash8) {
+                tx_tree.put("epid", epee::string_tools::pod_to_hex(tx.payment_id8));
+            }
+            else if (tx.payment_id != crypto::null_hash) {
+                tx_tree.put("pid", epee::string_tools::pod_to_hex(tx.payment_id));
+            }
 
-			txs_tree.push_back(std::make_pair("", tx_tree));
-		}
+            tx_tree.add_child("inputs", inputs_to_json(tx.inputs));
+            tx_tree.add_child("utxos", utxos_to_json(tx.utxos, true));
 
-		boost::property_tree::ptree wallet_tree;
-		wallet_tree.add_child("txs", txs_tree);
-		wallet_tree.put("subaddresses", pair.second.subaddresses);
+            txs_tree.push_back(std::make_pair("", tx_tree));
+        }
 
-		results_tree.add_child(pair.first, wallet_tree);
-	}
+        boost::property_tree::ptree wallet_tree;
+        wallet_tree.add_child("txs", txs_tree);
+        wallet_tree.put("subaddresses", pair.second.subaddresses);
 
-	root.add_child("results", results_tree);
+        results_tree.add_child(pair.first, wallet_tree);
+    }
 
-	return ret_json_from_root(root);
+    root.add_child("results", results_tree);
+
+    return ret_json_from_root(root);
 }
 
 std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, size_t length) {

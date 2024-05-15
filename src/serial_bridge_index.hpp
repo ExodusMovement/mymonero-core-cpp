@@ -82,27 +82,6 @@ namespace serial_bridge
 		uint64_t block_height;
 	};
 
-	struct BlockHeader {
-		uint8_t major_version;
-		uint8_t minor_version;  // now used as a voting mechanism, rather than how this particular block is built
-		uint64_t timestamp;
-		crypto::hash  previous_block_hash;
-		uint32_t nonce;		
-	};
-
-	struct BlockData {
-		BlockHeader block_header;
-		std::vector<crypto::hash> transaction_hashes;
-	};
-
-	struct BridgeBlock {
-		uint64_t id; // block height
-		bool prune = true;
-		BlockData block;
-		std::vector<std::string> txs;
-        BlockOutputIndices outputIndices;
-	};
-
 	struct BridgeTransaction {
 		std::string id;
 		uint8_t version;
@@ -175,6 +154,7 @@ namespace serial_bridge
 	NativeResponse extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string);
     NativeResponse extract_data_from_clarity_blocks_response(const char *buffer, size_t length, const string &args_string);
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
+    std::string extract_data_from_clarity_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 	std::string get_transaction_pool_hashes_str(const char *buffer, size_t length);
 	std::string decompress(const char *buffer, size_t length);
 
@@ -192,6 +172,7 @@ namespace serial_bridge
 	boost::property_tree::ptree inputs_to_json(std::vector<crypto::key_image> inputs);
 	boost::property_tree::ptree utxos_to_json(std::vector<Utxo> utxos, bool native = false);
 	boost::property_tree::ptree pruned_block_to_json(const PrunedBlock &pruned_block);
+    std::string native_response_to_json_str(NativeResponse resp);
 	std::string decode_amount(int version, crypto::key_derivation derivation, rct::rctSig rv, std::string amount, int index, rct::key& mask);
 	std::vector<Utxo> extract_utxos_from_tx(BridgeTransaction tx, cryptonote::account_keys account_keys, std::unordered_map<crypto::public_key, cryptonote::subaddress_index> &subaddresses);
     std::map<std::string, WalletAccountParams> get_wallet_accounts_params(boost::property_tree::ptree tree);
