@@ -156,7 +156,7 @@ namespace serial_bridge
 	std::string extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string);
     std::string extract_data_from_clarity_blocks_response_str(const char *buffer, size_t length, const string &args_string);
 	std::string get_transaction_pool_hashes_str(const char *buffer, size_t length);
-	std::string decompress(const char *buffer, size_t length);
+    const char* decompress(const char *buffer, size_t length);
 
 	//
 	// Helper Functions

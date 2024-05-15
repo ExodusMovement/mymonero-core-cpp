@@ -86,27 +86,28 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	return (const char *)arr;
 }
 
-std::string serial_bridge::decompress(const char *buffer, size_t length) {
+const char* serial_bridge::decompress(const char *buffer, size_t length) {
     if (buffer == nullptr || length == 0) {
         throw std::invalid_argument("Invalid input data");
     }
 
     int ret;
     z_stream strm;
-	std::string decompressedData;
-    unsigned char outBuffer[32768];
+    static const size_t BUFFER_SIZE = 32768;
+    unsigned char outBuffer[BUFFER_SIZE];
+    std::vector<char> decompressedData;  // Use vector<char> for dynamic storage
 
     // Initialize the decompression stream
     strm.zalloc = Z_NULL;
     strm.zfree = Z_NULL;
     strm.opaque = Z_NULL;
-	strm.avail_in = 0;
-	strm.total_out = 0;
+    strm.avail_in = 0;
+    strm.total_out = 0;
     strm.next_in = Z_NULL;
-	ret = inflateInit2(&strm, (16+MAX_WBITS)); // MAX_WBITS + 16 for gzip decoding
+    ret = inflateInit2(&strm, (16 + MAX_WBITS));  // MAX_WBITS + 16 for gzip decoding
     if (ret != Z_OK) {
-		throw std::runtime_error("inflateInit failed while decompressing.");
-	}
+        throw std::runtime_error("inflateInit failed while decompressing.");
+    }
 
     // Set the input data
     strm.avail_in = length;
@@ -124,7 +125,7 @@ std::string serial_bridge::decompress(const char *buffer, size_t length) {
                 inflateEnd(&strm);
                 throw std::runtime_error("Decompression error");
         }
-	
+
         decompressedData.insert(decompressedData.end(), outBuffer, outBuffer + sizeof(outBuffer) - strm.avail_out);
     } while (ret == Z_OK);
 
@@ -134,7 +135,12 @@ std::string serial_bridge::decompress(const char *buffer, size_t length) {
         throw std::runtime_error("Incomplete decompression: more data was expected");
     }
 
-	return decompressedData;
+    // Allocate memory for the return value
+    char* result = new char[decompressedData.size() + 1];
+    std::memcpy(result, decompressedData.data(), decompressedData.size());
+    result[decompressedData.size()] = '\0';  // Null-terminate the string
+
+    return result;
 }
 
 std::map<std::string, WalletAccountParams> serial_bridge::get_wallet_accounts_params(boost::property_tree::ptree tree) {
@@ -367,10 +373,22 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
 
-    std::string decompressed_blocks = serial_bridge::decompress(buffer, length);
     boost::property_tree::ptree blocks_json_root;
-    if (!parsed_json_root(decompressed_blocks, blocks_json_root)) {
-        native_resp.error = "Invalid blocks JSON";
+    const char* decompressed_blocks = nullptr;
+    try {
+        decompressed_blocks = serial_bridge::decompress(buffer, length);
+        if (!parsed_json_root(decompressed_blocks, blocks_json_root)) {
+            native_resp.error = "Invalid blocks JSON";
+            delete[] decompressed_blocks; // Clean up the allocated memory
+            return native_resp;
+        }
+    } catch (const std::exception& e) {
+        native_resp.error = std::string("Error processing blocks data from clarity: ") + e.what();
+
+        // Clean up the allocated memory
+        if (decompressed_blocks) {
+            delete[] decompressed_blocks;
+        }
         return native_resp;
     }
 
