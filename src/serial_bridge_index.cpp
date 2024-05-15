@@ -137,9 +137,9 @@ std::string serial_bridge::decompress(const char *buffer, size_t length) {
 	return decompressedData;
 }
 
-std::map<std::string, WalletAccountParams> serial_bridge::json_to_wallet_accounts_params(boost::property_tree::ptree params_by_wallet_account) {
+std::map<std::string, WalletAccountParams> serial_bridge::get_wallet_accounts_params(boost::property_tree::ptree tree) {
     std::map<std::string, WalletAccountParams> wallet_accounts_params;
-    for (const auto &params_desc : params_by_wallet_account) {
+    for (const auto &params_desc : tree) {
         WalletAccountParams wallet_account_params;
 
         if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
@@ -200,7 +200,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	uint64_t oldest = json_root.get<uint64_t>("oldest");
 	uint64_t size = json_root.get<uint64_t>("size");
 
-	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::json_to_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
+	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::get_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
 	for (const auto &pair : wallet_accounts_params) {
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
@@ -362,7 +362,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 	uint64_t oldest = json_root.get<uint64_t>("oldest");
 	uint64_t size = json_root.get<uint64_t>("size");
 
-	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::json_to_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
+	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::get_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
 	for (const auto &pair : wallet_accounts_params) {
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
