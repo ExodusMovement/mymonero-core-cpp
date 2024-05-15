@@ -47,6 +47,9 @@
 
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
 
+typedef std::vector<uint64_t> TxOutputIndices;
+typedef std::vector<TxOutputIndices> BlockOutputIndices;
+
 //
 // See serial_bridge_utils.hpp
 //
@@ -97,7 +100,7 @@ namespace serial_bridge
 		bool prune = true;
 		BlockData block;
 		std::vector<std::string> txs;
-		std::vector<std::vector<uint64_t>> outputIndices;
+        BlockOutputIndices outputIndices;
 	};
 
 	struct BridgeTransaction {

@@ -182,7 +182,7 @@ std::map<std::string, WalletAccountParams> serial_bridge::get_wallet_accounts_pa
         wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
     }
 
-    return wallet_accounts_params
+    return wallet_accounts_params;
 }
 
 NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
@@ -374,20 +374,40 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         return native_resp;
     }
 
-    for (const auto& item : blocks_json_root) {
-        boost::property_tree::ptree& block = array_element.second;
-        const auto& block_data = block.get_child("block");
-        const auto& txs = block.get_child("txs");
-        const auto& tx_hashes = block_data.get_child("transaction_hashes");
-        uint64_t height = item.second.get<uint64_t>("id");
+    for (auto &block_json_root : blocks_json_root) {
+        boost::property_tree::ptree& block_entry = block_json_root.second;
 
-		native_resp.end_height = std::max(native_resp.end_height, height);
+        uint64_t height = block_entry.get<uint64_t>("id");
+        auto& block = block_entry.get_child("block");
+
+        uint64_t timestamp = block.get<uint64_t>("block_header.timestamp");
+
+        std::vector<std::string> tx_hashes;
+        for (const auto& hash : block.get_child("transaction_hashes")) {
+            tx_hashes.push_back(hash.second.data());
+        }
+
+        std::vector<std::string> txs;
+        for (const auto& tx : block_entry.get_child("txs")) {
+            txs.push_back(tx.second.data());
+        }
+
+        BlockOutputIndices output_indices;
+        for (auto& output_index_array : block_entry.get_child("outputIndices")) {
+            TxOutputIndices indices;
+            for (auto& index : output_index_array.second) {
+                indices.push_back(index.second.get_value<uint64_t>());
+            }
+            output_indices.push_back(indices);
+        }
+
+        native_resp.end_height = std::max(native_resp.end_height, height);
 
         PrunedBlock pruned_block;
         pruned_block.block_height = height;
-		pruned_block.timestamp = b.timestamp;
+		pruned_block.timestamp = timestamp;
         for (size_t j = 0; j < txs.size(); j++) {
-            std::string tx_base64 = txs[j].get<std::string>();
+            std::string tx_base64 = txs[j];
 			cryptonote::transaction tx;
 
 			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_base64, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_base64, tx);
@@ -402,7 +422,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 			BridgeTransaction bridge_tx;
 			bridge_tx.id = tx_hashes[j];
 			bridge_tx.version = tx.version;
-			bridge_tx.timestamp = b.timestamp;
+			bridge_tx.timestamp = timestamp;
 			bridge_tx.block_height = height;
 			bridge_tx.rv = tx.rct_signatures;
 			bridge_tx.pub = get_extra_pub_key(fields);
@@ -423,7 +443,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 					auto &output = bridge_tx.outputs[k];
 
 					Mixin mixin;
-					mixin.global_index = resp.output_indices[i].indices[j + 1].indices[output.index];
+					mixin.global_index = output_indices[j + 1][output.index];
 					mixin.public_key = output.pub;
 					mixin.rct = build_rct(bridge_tx.rv, output.index);
 
@@ -443,7 +463,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 				for (size_t k = 0; k < tx_utxos.size(); k++)
 				{
 					auto &utxo = tx_utxos[k];
-					utxo.global_index = resp.output_indices[i].indices[j + 1].indices[utxo.vout];
+					utxo.global_index = output_indices[j + 1][utxo.vout];
 
 					if (!wallet_account_params.has_send_txs)
 					{
@@ -488,7 +508,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 		result.subaddresses = pair.second.subaddresses.size();
 	}
 
-	native_resp.current_height = resp.current_height;
+	native_resp.current_height = 0;
 	native_resp.latest = latest;
 	native_resp.oldest = oldest;
 	native_resp.size = size;
