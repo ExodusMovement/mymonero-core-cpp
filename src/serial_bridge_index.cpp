@@ -248,7 +248,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			cryptonote::transaction tx;
 
 			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_entry.blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_entry.blob, tx);
-			if (!tx_parsed)
+            if (!tx_parsed)
 				continue;
 
 			std::vector<cryptonote::tx_extra_field> fields;
@@ -407,7 +407,9 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 
         std::vector<std::string> txs;
         for (const auto& tx : block_entry.get_child("txs")) {
-            txs.push_back(tx.second.data());
+            std::string tx_blob;
+            decode_base64(tx.second.data(), tx_blob);
+            txs.push_back(tx_blob);
         }
 
         BlockOutputIndices output_indices;
@@ -425,11 +427,11 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         pruned_block.block_height = height;
 		pruned_block.timestamp = timestamp;
         for (size_t j = 0; j < txs.size(); j++) {
-            std::string tx_base64 = txs[j];
+            std::string tx_blob = txs[j];
 			cryptonote::transaction tx;
 
-			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_base64, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_base64, tx);
-			if (!tx_parsed)
+			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
+            if (!tx_parsed)
 				continue;
 
 			std::vector<cryptonote::tx_extra_field> fields;
