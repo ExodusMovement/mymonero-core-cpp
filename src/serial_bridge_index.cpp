@@ -49,6 +49,7 @@
 #include "common/threadpool.h"
 #include "storages/portable_storage_template_helper.h"
 //
+#include "extend_helpers.hpp"
 #include "serial_bridge_utils.hpp"
 
 #ifdef __linux__
@@ -60,6 +61,7 @@
 using namespace std;
 using namespace boost;
 using namespace cryptonote;
+using namespace extend_helpers;
 using namespace monero_transfer_utils;
 using namespace monero_fork_rules;
 //
@@ -546,7 +548,7 @@ std::string serial_bridge::extract_data_from_clarity_blocks_response_str(const c
     return serial_bridge::native_response_to_json_str(resp);
 }
 
-std::string serial_bridge::native_response_to_json_str(NativeResponse resp) {
+std::string serial_bridge::native_response_to_json_str(const NativeResponse &resp) {
     boost::property_tree::ptree root;
 
     if (!resp.error.empty()) {
