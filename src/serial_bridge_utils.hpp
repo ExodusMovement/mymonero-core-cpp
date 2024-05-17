@@ -38,7 +38,9 @@
 #include <boost/property_tree/json_parser.hpp>
 //
 #include "cryptonote_config.h"
+#include "cryptonote_basic/blobdatatype.h"
 //
+
 namespace serial_bridge_utils
 {
 	using namespace std;
@@ -79,6 +81,7 @@ namespace serial_bridge_utils
 	string ret_json_from_root(const boost::property_tree::ptree &root);
 	string error_ret_json_from_message(const string &err_msg);
 	string error_ret_json_from_code(int code, optional<string> err_msg);
+
 	//
 	// JSON keys - Ret vals
 	// - - Error

@@ -49,6 +49,7 @@
 #include "common/threadpool.h"
 #include "storages/portable_storage_template_helper.h"
 //
+#include "extend_helpers.hpp"
 #include "serial_bridge_utils.hpp"
 
 #ifdef __linux__
@@ -60,6 +61,7 @@
 using namespace std;
 using namespace boost;
 using namespace cryptonote;
+using namespace extend_helpers;
 using namespace monero_transfer_utils;
 using namespace monero_fork_rules;
 //
@@ -86,6 +88,111 @@ const char *serial_bridge::create_blocks_request(int height, size_t *length) {
 	return (const char *)arr;
 }
 
+const char* serial_bridge::decompress(const char *buffer, size_t length) {
+    if (buffer == nullptr || length == 0) {
+        throw std::invalid_argument("Invalid input data");
+    }
+
+    int ret;
+    z_stream strm;
+    static const size_t BUFFER_SIZE = 32768;
+    unsigned char outBuffer[BUFFER_SIZE];
+    std::vector<char> decompressedData;  // Use vector<char> for dynamic storage
+
+    // Initialize the decompression stream
+    strm.zalloc = Z_NULL;
+    strm.zfree = Z_NULL;
+    strm.opaque = Z_NULL;
+    strm.avail_in = 0;
+    strm.total_out = 0;
+    strm.next_in = Z_NULL;
+    ret = inflateInit2(&strm, (16 + MAX_WBITS));  // MAX_WBITS + 16 for gzip decoding
+    if (ret != Z_OK) {
+        throw std::runtime_error("inflateInit failed while decompressing.");
+    }
+
+    // Set the input data
+    strm.avail_in = length;
+    strm.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(buffer));
+
+    // Decompress until deflate stream ends or end of file
+    do {
+        strm.avail_out = sizeof(outBuffer);
+        strm.next_out = outBuffer;
+        ret = inflate(&strm, Z_NO_FLUSH);
+        switch (ret) {
+            case Z_NEED_DICT:
+            case Z_DATA_ERROR:
+            case Z_MEM_ERROR:
+                inflateEnd(&strm);
+                throw std::runtime_error("Decompression error");
+        }
+
+        decompressedData.insert(decompressedData.end(), outBuffer, outBuffer + sizeof(outBuffer) - strm.avail_out);
+    } while (ret == Z_OK);
+
+    // Clean up the zlib stream
+    inflateEnd(&strm);
+    if (ret != Z_STREAM_END) {
+        throw std::runtime_error("Incomplete decompression: more data was expected");
+    }
+
+    // Allocate memory for the return value
+    char* result = new char[decompressedData.size() + 1];
+    std::memcpy(result, decompressedData.data(), decompressedData.size());
+    result[decompressedData.size()] = '\0';  // Null-terminate the string
+
+    return result;
+}
+
+std::map<std::string, WalletAccountParams> serial_bridge::get_wallet_accounts_params(boost::property_tree::ptree tree) {
+    std::map<std::string, WalletAccountParams> wallet_accounts_params;
+    for (const auto &params_desc : tree) {
+        WalletAccountParams wallet_account_params;
+
+        if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
+            continue;
+        }
+
+        if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key)) {
+            continue;
+        }
+
+        wallet_account_params.account_keys.m_spend_secret_key = crypto::null_skey;
+        auto secSpendKeyString = params_desc.second.get_optional<string>("sec_spendKey_string");
+        if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key)) {
+            continue;
+        }
+
+        auto send_txs_child = params_desc.second.get_child_optional("send_txs");
+        if (send_txs_child) {
+            wallet_account_params.has_send_txs = true;
+
+            for (const auto &send_tx_desc : *send_txs_child) {
+                assert(send_tx_desc.first.empty());
+                wallet_account_params.send_txs.insert(std::pair<std::string, bool>(send_tx_desc.second.get_value<std::string>(), true));
+            }
+        }
+
+        auto key_images_child = params_desc.second.get_child_optional("key_images");
+        if (key_images_child) {
+            for (const auto &image_desc : *key_images_child) {
+                assert(image_desc.first.empty());
+                wallet_account_params.gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
+            }
+        }
+
+        uint32_t subaddresses_count = params_desc.second.get<uint32_t>("subaddresses");
+
+        cryptonote::subaddress_index index = {0, 0};
+        expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index, subaddresses_count);
+
+        wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
+    }
+
+    return wallet_accounts_params;
+}
+
 NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buffer, size_t length, const string &args_string) {
 	NativeResponse native_resp;
 
@@ -101,48 +208,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	uint64_t oldest = json_root.get<uint64_t>("oldest");
 	uint64_t size = json_root.get<uint64_t>("size");
 
-	std::map<std::string, WalletAccountParams> wallet_accounts_params;
-	for (const auto &params_desc : json_root.get_child("params_by_wallet_account")) {
-		WalletAccountParams wallet_account_params;
-
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("sec_viewKey_string"), wallet_account_params.account_keys.m_view_secret_key)) {
-			continue;
-		}
-
-		if (!epee::string_tools::hex_to_pod(params_desc.second.get<string>("pub_spendKey_string"), wallet_account_params.account_keys.m_account_address.m_spend_public_key)) {
-			continue;
-		}
-
-		wallet_account_params.account_keys.m_spend_secret_key = crypto::null_skey;
-		auto secSpendKeyString = params_desc.second.get_optional<string>("sec_spendKey_string");
-		if (secSpendKeyString && !epee::string_tools::hex_to_pod(*secSpendKeyString, wallet_account_params.account_keys.m_spend_secret_key)) {
-			continue;
-		}
-
-		auto send_txs_child = params_desc.second.get_child_optional("send_txs");
-		if (send_txs_child) {
-			wallet_account_params.has_send_txs = true;
-
-			for (const auto &send_tx_desc : *send_txs_child) {
-				assert(send_tx_desc.first.empty());
-				wallet_account_params.send_txs.insert(std::pair<std::string, bool>(send_tx_desc.second.get_value<std::string>(), true));
-			}
-		}
-		else {
-			for (const auto &image_desc : params_desc.second.get_child("key_images")) {
-				assert(image_desc.first.empty());
-				wallet_account_params.gki.insert(std::pair<std::string, bool>(image_desc.second.get_value<std::string>(), true));
-			}
-		}
-
-		uint32_t subaddresses_count = params_desc.second.get<uint32_t>("subaddresses");
-
-		cryptonote::subaddress_index index = {0, 0};
-		expand_subaddresses(wallet_account_params.account_keys, wallet_account_params.subaddresses, index, subaddresses_count);
-
-		wallet_accounts_params.insert(std::make_pair(params_desc.first, wallet_account_params));
-	}
-
+	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::get_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
 	for (const auto &pair : wallet_accounts_params) {
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
@@ -184,7 +250,7 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 			cryptonote::transaction tx;
 
 			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_entry.blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_entry.blob, tx);
-			if (!tx_parsed)
+            if (!tx_parsed)
 				continue;
 
 			std::vector<cryptonote::tx_extra_field> fields;
@@ -289,67 +355,258 @@ NativeResponse serial_bridge::extract_data_from_blocks_response(const char *buff
 	return native_resp;
 }
 
-std::string serial_bridge::extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
-	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
+NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const char *buffer, size_t length, const string &args_string) {
+	NativeResponse native_resp;
 
-	boost::property_tree::ptree root;
-
-	if (!resp.error.empty()) {
-		root.put(ret_json_key__any__err_msg(), resp.error);
-		return ret_json_from_root(root);
+	boost::property_tree::ptree json_root;
+	if (!parsed_json_root(args_string, json_root)) {
+		native_resp.error = "Invalid JSON";
+		return native_resp;
 	}
 
-	root.put("current_height", resp.current_height);
-	root.put("end_height", resp.end_height);
-	root.put("latest", resp.latest);
-	root.put("oldest", resp.oldest);
-	root.put("size", resp.size);
+	std::string storage_path = json_root.get<string>("storage_path");
+	uint8_t storage_rate = json_root.get<uint8_t>("storage_percent");
+	uint64_t latest = json_root.get<uint64_t>("latest");
+	uint64_t oldest = json_root.get<uint64_t>("oldest");
+	uint64_t size = json_root.get<uint64_t>("size");
 
-	boost::property_tree::ptree results_tree;
-	for (const auto &pair : resp.results_by_wallet_account) {
-		boost::property_tree::ptree txs_tree;
-		for (const auto &tx : pair.second.txs) {
-			boost::property_tree::ptree tx_tree;
+	std::map<std::string, WalletAccountParams> wallet_accounts_params = serial_bridge::get_wallet_accounts_params(json_root.get_child("params_by_wallet_account"));
+	for (const auto &pair : wallet_accounts_params) {
+		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
+	}
 
-			tx_tree.put("id", tx.id);
-			tx_tree.put("timestamp", tx.timestamp);
-			tx_tree.put("height", tx.block_height);
-			tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
+    boost::property_tree::ptree blocks_json_root;
+    const char* decompressed_blocks = nullptr;
+    try {
+        decompressed_blocks = serial_bridge::decompress(buffer, length);
+        if (!parsed_json_root(decompressed_blocks, blocks_json_root)) {
+            native_resp.error = "Invalid blocks JSON";
+            delete[] decompressed_blocks; // Clean up the allocated memory
+            return native_resp;
+        }
+    } catch (const std::exception& e) {
+        native_resp.error = std::string("Error processing blocks data from clarity: ") + e.what();
 
-			boost::property_tree::ptree additional_pubs_tree;
-			for (const auto& pub : tx.additional_pubs) {
-				boost::property_tree::ptree value;
-				value.put("", epee::string_tools::pod_to_hex(pub));
+        // Clean up the allocated memory
+        if (decompressed_blocks) {
+            delete[] decompressed_blocks;
+        }
+        return native_resp;
+    }
 
-				additional_pubs_tree.push_back(std::make_pair("", value));
+    for (auto &block_json_root : blocks_json_root) {
+        boost::property_tree::ptree& block_entry = block_json_root.second;
+
+        uint64_t height = block_entry.get<uint64_t>("id");
+        auto& block = block_entry.get_child("block");
+
+        uint64_t timestamp = block.get<uint64_t>("block_header.timestamp");
+
+        std::vector<std::string> tx_hashes;
+        for (const auto& hash : block.get_child("transaction_hashes")) {
+            tx_hashes.push_back(hash.second.data());
+        }
+
+        std::vector<std::string> txs;
+        for (const auto& tx : block_entry.get_child("txs")) {
+            std::string tx_blob;
+            decode_base64(tx.second.data(), tx_blob);
+            txs.push_back(tx_blob);
+        }
+
+        BlockOutputIndices output_indices;
+        for (auto& output_index_array : block_entry.get_child("outputIndices")) {
+            TxOutputIndices indices;
+            for (auto& index : output_index_array.second) {
+                indices.push_back(index.second.get_value<uint64_t>());
+            }
+            output_indices.push_back(indices);
+        }
+
+        native_resp.end_height = std::max(native_resp.end_height, height);
+
+        PrunedBlock pruned_block;
+        pruned_block.block_height = height;
+		pruned_block.timestamp = timestamp;
+        for (size_t j = 0; j < txs.size(); j++) {
+            std::string tx_blob = txs[j];
+			cryptonote::transaction tx;
+
+			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
+            if (!tx_parsed)
+				continue;
+
+			std::vector<cryptonote::tx_extra_field> fields;
+			auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
+			if (!extra_parsed)
+				continue;
+
+			BridgeTransaction bridge_tx;
+			bridge_tx.id = tx_hashes[j];
+			bridge_tx.version = tx.version;
+			bridge_tx.timestamp = timestamp;
+			bridge_tx.block_height = height;
+			bridge_tx.rv = tx.rct_signatures;
+			bridge_tx.pub = get_extra_pub_key(fields);
+			bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
+			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
+			bridge_tx.outputs = get_outputs(tx);
+
+			auto nonce = get_extra_nonce(fields);
+			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8))
+			{
+				cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
 			}
-			tx_tree.add_child("additional_pubs", additional_pubs_tree);
 
-			tx_tree.put("fee", tx.fee_amount);
+			if (bridge_tx.version == 2)
+			{
+				for (size_t k = 0; k < bridge_tx.outputs.size(); k++)
+				{
+					auto &output = bridge_tx.outputs[k];
 
-			if (tx.payment_id8 != crypto::null_hash8) {
-				tx_tree.put("epid", epee::string_tools::pod_to_hex(tx.payment_id8));
+					Mixin mixin;
+					mixin.global_index = output_indices[j + 1][output.index];
+					mixin.public_key = output.pub;
+					mixin.rct = build_rct(bridge_tx.rv, output.index);
+
+					pruned_block.mixins.push_back(mixin);
+				}
 			}
-			else if (tx.payment_id != crypto::null_hash) {
-				tx_tree.put("pid", epee::string_tools::pod_to_hex(tx.payment_id));
+
+			for (auto &pair : wallet_accounts_params)
+			{
+				auto bridge_tx_copy = bridge_tx;
+
+				auto &wallet_account_params = pair.second;
+				bridge_tx_copy.inputs = wallet_account_params.has_send_txs ? get_inputs_with_send_txs(tx, bridge_tx_copy, wallet_account_params.send_txs) : get_inputs(tx, bridge_tx_copy, wallet_account_params.gki);
+
+				auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys, wallet_account_params.subaddresses);
+
+				for (size_t k = 0; k < tx_utxos.size(); k++)
+				{
+					auto &utxo = tx_utxos[k];
+					utxo.global_index = output_indices[j + 1][utxo.vout];
+
+					if (!wallet_account_params.has_send_txs)
+					{
+						wallet_account_params.gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
+					}
+				}
+
+				bridge_tx_copy.utxos = tx_utxos;
+
+				if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0)
+				{
+					auto &result = native_resp.results_by_wallet_account[pair.first];
+					result.txs.push_back(bridge_tx_copy);
+				}
 			}
-
-			tx_tree.add_child("inputs", inputs_to_json(tx.inputs));
-			tx_tree.add_child("utxos", utxos_to_json(tx.utxos, true));
-
-			txs_tree.push_back(std::make_pair("", tx_tree));
 		}
 
-		boost::property_tree::ptree wallet_tree;
-		wallet_tree.add_child("txs", txs_tree);
-		wallet_tree.put("subaddresses", pair.second.subaddresses);
+#ifndef EMSCRIPTEN
+		if (pruned_block.block_height >= oldest && pruned_block.block_height <= latest)
+			continue;
+		if (size <= 100 || arc4random_uniform(100) < storage_rate)
+		{
+			std::ofstream f;
+			f.open(storage_path + std::to_string(pruned_block.block_height) + ".json");
+			f << ret_json_from_root(pruned_block_to_json(pruned_block));
 
-		results_tree.add_child(pair.first, wallet_tree);
+			if (f.good())
+			{
+				latest = std::max(latest, pruned_block.block_height);
+				oldest = std::min(oldest, pruned_block.block_height);
+				size += 1;
+			}
+
+			f.close();
+		}
+#endif
 	}
 
-	root.add_child("results", results_tree);
+	for (const auto& pair : wallet_accounts_params) {
+		auto &result = native_resp.results_by_wallet_account[pair.first];
 
-	return ret_json_from_root(root);
+		result.subaddresses = pair.second.subaddresses.size();
+	}
+
+	native_resp.current_height = 0; // clarity does not return it in the blocks API, we need to get it from monitor
+	native_resp.latest = latest;
+	native_resp.oldest = oldest;
+	native_resp.size = size;
+
+	return native_resp;
+}
+
+std::string serial_bridge::extract_data_from_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
+	auto resp = serial_bridge::extract_data_from_blocks_response(buffer, length, args_string);
+    return serial_bridge::native_response_to_json_str(resp);
+}
+
+std::string serial_bridge::extract_data_from_clarity_blocks_response_str(const char *buffer, size_t length, const string &args_string) {
+    auto resp = serial_bridge::extract_data_from_clarity_blocks_response(buffer, length, args_string);
+    return serial_bridge::native_response_to_json_str(resp);
+}
+
+std::string serial_bridge::native_response_to_json_str(const NativeResponse &resp) {
+    boost::property_tree::ptree root;
+
+    if (!resp.error.empty()) {
+        root.put(ret_json_key__any__err_msg(), resp.error);
+        return ret_json_from_root(root);
+    }
+
+    root.put("current_height", resp.current_height);
+    root.put("end_height", resp.end_height);
+    root.put("latest", resp.latest);
+    root.put("oldest", resp.oldest);
+    root.put("size", resp.size);
+
+    boost::property_tree::ptree results_tree;
+    for (const auto &pair : resp.results_by_wallet_account) {
+        boost::property_tree::ptree txs_tree;
+        for (const auto &tx : pair.second.txs) {
+            boost::property_tree::ptree tx_tree;
+
+            tx_tree.put("id", tx.id);
+            tx_tree.put("timestamp", tx.timestamp);
+            tx_tree.put("height", tx.block_height);
+            tx_tree.put("pub", epee::string_tools::pod_to_hex(tx.pub));
+
+            boost::property_tree::ptree additional_pubs_tree;
+            for (const auto& pub : tx.additional_pubs) {
+                boost::property_tree::ptree value;
+                value.put("", epee::string_tools::pod_to_hex(pub));
+
+                additional_pubs_tree.push_back(std::make_pair("", value));
+            }
+            tx_tree.add_child("additional_pubs", additional_pubs_tree);
+
+            tx_tree.put("fee", tx.fee_amount);
+
+            if (tx.payment_id8 != crypto::null_hash8) {
+                tx_tree.put("epid", epee::string_tools::pod_to_hex(tx.payment_id8));
+            }
+            else if (tx.payment_id != crypto::null_hash) {
+                tx_tree.put("pid", epee::string_tools::pod_to_hex(tx.payment_id));
+            }
+
+            tx_tree.add_child("inputs", inputs_to_json(tx.inputs));
+            tx_tree.add_child("utxos", utxos_to_json(tx.utxos, true));
+
+            txs_tree.push_back(std::make_pair("", tx_tree));
+        }
+
+        boost::property_tree::ptree wallet_tree;
+        wallet_tree.add_child("txs", txs_tree);
+        wallet_tree.put("subaddresses", pair.second.subaddresses);
+
+        results_tree.add_child(pair.first, wallet_tree);
+    }
+
+    root.add_child("results", results_tree);
+
+    return ret_json_from_root(root);
 }
 
 std::string serial_bridge::get_transaction_pool_hashes_str(const char *buffer, size_t length) {
