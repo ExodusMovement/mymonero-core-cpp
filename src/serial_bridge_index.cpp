@@ -505,7 +505,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 		pruned_block.timestamp = timestamp;
         for (size_t j = 0; j < txs.size(); j++) {
             try {
-				tx = txs[j];
+				std::string tx = txs[j];
 				tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
 			} catch(std::invalid_argument err) {
 				continue;
