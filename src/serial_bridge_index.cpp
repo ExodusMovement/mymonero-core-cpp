@@ -395,17 +395,17 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 	tools::threadpool& tpool = tools::threadpool::getInstance();
   	tools::threadpool::waiter waiter(tpool);
 
-	auto geniod = [&](const std::string tx_blob) {
+	auto geniod = [&](const std::string tx_blob, const size_t j, std::vector<std::string> tx_hashes, const uint64_t timestamp, const uint64_t height, const BlockOutputIndices output_indices, PrunedBlock &pruned_block) {
 		cryptonote::transaction tx;
 
 		auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
 		if (!tx_parsed)
-			continue;
+			return;
 
 		std::vector<cryptonote::tx_extra_field> fields;
 		auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
 		if (!extra_parsed)
-			continue;
+			return;
 
 		BridgeTransaction bridge_tx;
 		bridge_tx.id = tx_hashes[j];
@@ -506,7 +506,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         for (size_t j = 0; j < txs.size(); j++) {
             try {
 				std::string tx = txs[j];
-				tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
+				tpool.submit(&waiter, [&, tx](){ geniod(tx, j, tx_hashes, timestamp, height, output_indices, pruned_block); }, true);
 			} catch(std::invalid_argument err) {
 				continue;
 			}
