@@ -392,6 +392,83 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         return native_resp;
     }
 
+	tools::threadpool& tpool = tools::threadpool::getInstance();
+  	tools::threadpool::waiter waiter(tpool);
+
+	auto geniod = [&](const std::string tx_blob) {
+		cryptonote::transaction tx;
+
+		auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
+		if (!tx_parsed)
+			continue;
+
+		std::vector<cryptonote::tx_extra_field> fields;
+		auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
+		if (!extra_parsed)
+			continue;
+
+		BridgeTransaction bridge_tx;
+		bridge_tx.id = tx_hashes[j];
+		bridge_tx.version = tx.version;
+		bridge_tx.timestamp = timestamp;
+		bridge_tx.block_height = height;
+		bridge_tx.rv = tx.rct_signatures;
+		bridge_tx.pub = get_extra_pub_key(fields);
+		bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
+		bridge_tx.fee_amount = get_fee(tx, bridge_tx);
+		bridge_tx.outputs = get_outputs(tx);
+
+		auto nonce = get_extra_nonce(fields);
+		if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8))
+		{
+			cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
+		}
+
+		if (bridge_tx.version == 2)
+		{
+			for (size_t k = 0; k < bridge_tx.outputs.size(); k++)
+			{
+				auto &output = bridge_tx.outputs[k];
+
+				Mixin mixin;
+				mixin.global_index = output_indices[j + 1][output.index];
+				mixin.public_key = output.pub;
+				mixin.rct = build_rct(bridge_tx.rv, output.index);
+
+				pruned_block.mixins.push_back(mixin);
+			}
+		}
+
+		for (auto &pair : wallet_accounts_params)
+		{
+			auto bridge_tx_copy = bridge_tx;
+
+			auto &wallet_account_params = pair.second;
+			bridge_tx_copy.inputs = wallet_account_params.has_send_txs ? get_inputs_with_send_txs(tx, bridge_tx_copy, wallet_account_params.send_txs) : get_inputs(tx, bridge_tx_copy, wallet_account_params.gki);
+
+			auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys, wallet_account_params.subaddresses);
+
+			for (size_t k = 0; k < tx_utxos.size(); k++)
+			{
+				auto &utxo = tx_utxos[k];
+				utxo.global_index = output_indices[j + 1][utxo.vout];
+
+				if (!wallet_account_params.has_send_txs)
+				{
+					wallet_account_params.gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
+				}
+			}
+
+			bridge_tx_copy.utxos = tx_utxos;
+
+			if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0)
+			{
+				auto &result = native_resp.results_by_wallet_account[pair.first];
+				result.txs.push_back(bridge_tx_copy);
+			}
+		}
+	};
+
     for (auto &block_json_root : blocks_json_root) {
         boost::property_tree::ptree& block_entry = block_json_root.second;
 
@@ -427,79 +504,14 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         pruned_block.block_height = height;
 		pruned_block.timestamp = timestamp;
         for (size_t j = 0; j < txs.size(); j++) {
-            std::string tx_blob = txs[j];
-			cryptonote::transaction tx;
-
-			auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
-            if (!tx_parsed)
+            try {
+				tx = txs[j];
+				tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
+			} catch(std::invalid_argument err) {
 				continue;
-
-			std::vector<cryptonote::tx_extra_field> fields;
-			auto extra_parsed = cryptonote::parse_tx_extra(tx.extra, fields);
-			if (!extra_parsed)
-				continue;
-
-			BridgeTransaction bridge_tx;
-			bridge_tx.id = tx_hashes[j];
-			bridge_tx.version = tx.version;
-			bridge_tx.timestamp = timestamp;
-			bridge_tx.block_height = height;
-			bridge_tx.rv = tx.rct_signatures;
-			bridge_tx.pub = get_extra_pub_key(fields);
-			bridge_tx.additional_pubs = get_extra_additional_tx_pub_keys(fields);
-			bridge_tx.fee_amount = get_fee(tx, bridge_tx);
-			bridge_tx.outputs = get_outputs(tx);
-
-			auto nonce = get_extra_nonce(fields);
-			if (!cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id8))
-			{
-				cryptonote::get_payment_id_from_tx_extra_nonce(nonce, bridge_tx.payment_id);
-			}
-
-			if (bridge_tx.version == 2)
-			{
-				for (size_t k = 0; k < bridge_tx.outputs.size(); k++)
-				{
-					auto &output = bridge_tx.outputs[k];
-
-					Mixin mixin;
-					mixin.global_index = output_indices[j + 1][output.index];
-					mixin.public_key = output.pub;
-					mixin.rct = build_rct(bridge_tx.rv, output.index);
-
-					pruned_block.mixins.push_back(mixin);
-				}
-			}
-
-			for (auto &pair : wallet_accounts_params)
-			{
-				auto bridge_tx_copy = bridge_tx;
-
-				auto &wallet_account_params = pair.second;
-				bridge_tx_copy.inputs = wallet_account_params.has_send_txs ? get_inputs_with_send_txs(tx, bridge_tx_copy, wallet_account_params.send_txs) : get_inputs(tx, bridge_tx_copy, wallet_account_params.gki);
-
-				auto tx_utxos = extract_utxos_from_tx(bridge_tx_copy, wallet_account_params.account_keys, wallet_account_params.subaddresses);
-
-				for (size_t k = 0; k < tx_utxos.size(); k++)
-				{
-					auto &utxo = tx_utxos[k];
-					utxo.global_index = output_indices[j + 1][utxo.vout];
-
-					if (!wallet_account_params.has_send_txs)
-					{
-						wallet_account_params.gki.insert(std::pair<std::string, bool>(utxo.key_image, true));
-					}
-				}
-
-				bridge_tx_copy.utxos = tx_utxos;
-
-				if (bridge_tx_copy.utxos.size() != 0 || bridge_tx_copy.inputs.size() != 0)
-				{
-					auto &result = native_resp.results_by_wallet_account[pair.first];
-					result.txs.push_back(bridge_tx_copy);
-				}
 			}
 		}
+		THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
 
 #ifndef EMSCRIPTEN
 		if (pruned_block.block_height >= oldest && pruned_block.block_height <= latest)
