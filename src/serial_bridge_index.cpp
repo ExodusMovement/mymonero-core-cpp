@@ -395,7 +395,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 	tools::threadpool& tpool = tools::threadpool::getInstance();
   	tools::threadpool::waiter waiter(tpool);
 
-	auto geniod = [&](const std::string tx_blob, const size_t j, std::vector<std::string> tx_hashes, const uint64_t timestamp, const uint64_t height, const BlockOutputIndices output_indices, PrunedBlock &pruned_block) {
+	auto geniod = [&](const std::string& tx_blob, const size_t j, std::vector<std::string>& tx_hashes, const uint64_t timestamp, const uint64_t height, const BlockOutputIndices& output_indices, PrunedBlock& pruned_block) {
 		cryptonote::transaction tx;
 
 		auto tx_parsed = cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx) || cryptonote::parse_and_validate_tx_base_from_blob(tx_blob, tx);
@@ -504,13 +504,16 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         pruned_block.block_height = height;
 		pruned_block.timestamp = timestamp;
         for (size_t j = 0; j < txs.size(); j++) {
-            try {
+			try {
 				std::string tx = txs[j];
-				tpool.submit(&waiter, [&, tx](){ geniod(tx, j, tx_hashes, timestamp, height, output_indices, pruned_block); }, true);
-			} catch(std::invalid_argument err) {
+				tpool.submit(&waiter, [&, tx, j, &tx_hashes, timestamp, height, &output_indices, &pruned_block]() {
+					geniod(tx, j, tx_hashes, timestamp, height, output_indices, pruned_block);
+				}, true);
+			} catch(const std::invalid_argument& err) {
 				continue;
 			}
 		}
+
 		THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
 
 #ifndef EMSCRIPTEN
