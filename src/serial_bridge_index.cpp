@@ -506,7 +506,7 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
         for (size_t j = 0; j < txs.size(); j++) {
 			try {
 				std::string tx = txs[j];
-				tpool.submit(&waiter, [&, tx, j, &tx_hashes, timestamp, height, &output_indices, &pruned_block]() {
+				tpool.submit(&waiter, [tx, j, &tx_hashes, timestamp, height, &output_indices, &pruned_block, &geniod]() {
 					geniod(tx, j, tx_hashes, timestamp, height, output_indices, pruned_block);
 				}, true);
 			} catch(const std::invalid_argument& err) {
