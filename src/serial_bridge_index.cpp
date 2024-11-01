@@ -373,22 +373,14 @@ NativeResponse serial_bridge::extract_data_from_clarity_blocks_response(const ch
 		native_resp.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractTransactionsResult{}));
 	}
 
-    boost::property_tree::ptree blocks_json_root;
-    const char* decompressed_blocks = nullptr;
+	// Convert buffer to string for parsing to JSON
+	boost::property_tree::ptree blocks_json_root;
+    std::string json_string(buffer, length);
     try {
-        decompressed_blocks = serial_bridge::decompress(buffer, length);
-        if (!parsed_json_root(decompressed_blocks, blocks_json_root)) {
-            native_resp.error = "Invalid blocks JSON";
-            delete[] decompressed_blocks; // Clean up the allocated memory
-            return native_resp;
-        }
+        std::stringstream ss(json_string);
+        boost::property_tree::read_json(ss, blocks_json_root);
     } catch (const std::exception& e) {
         native_resp.error = std::string("Error processing blocks data from clarity: ") + e.what();
-
-        // Clean up the allocated memory
-        if (decompressed_blocks) {
-            delete[] decompressed_blocks;
-        }
         return native_resp;
     }
 
