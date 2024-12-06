@@ -189,16 +189,6 @@ namespace serial_bridge
 	string is_subaddress(const string &args_string);
 	string is_integrated_address(const string &args_string);
 	//
-	string new_integrated_address(const string &args_string);
-	string new_payment_id(const string &args_string);
-	//
-	string newly_created_wallet(const string &args_string);
-	string are_equal_mnemonics(const string &args_string);
-	string address_and_keys_from_seed(const string &args_string); // aka legacy mymonero-core-js:create_address
-	string mnemonic_from_seed(const string &args_string);
-	string seed_and_keys_from_mnemonic(const string &args_string);
-	string validate_components_for_login(const string &args_string);
-	//
 	string estimated_tx_network_fee(const string &args_string);
 	string estimate_fee(const string &args_string);
 	string estimate_tx_weight(const string &args_string);
