@@ -92,35 +92,3 @@ bool address_utils::isIntegratedAddress(const string &addressString, cryptonote:
 	}
 	return retVals.paymentID_string != boost::none;
 }
-//
-optional<string> address_utils::new_integratedAddrFromStdAddr(const string &std_address_string, const string &short_paymentID_string, cryptonote::network_type nettype)
-{
-	crypto::hash8 payment_id_short;
-	bool didParse = monero_paymentID_utils::parse_short_payment_id(short_paymentID_string, payment_id_short);
-	if (!didParse) {
-		return none;
-	}
-	cryptonote::address_parse_info info;
-	bool didSucceed = cryptonote::get_account_address_from_str(
-		info,
-		nettype,
-		std_address_string
-	);
-	if (didSucceed == false) {
-		return none;
-	}
-	if (info.is_subaddress) {
-		THROW_WALLET_EXCEPTION_IF(true, tools::error::wallet_internal_error, "new_integratedAddrFromStdAddr must not be called with a subaddress");
-		return none;
-	}
-	if (info.has_payment_id != false) {
-		// could even throw / fatalError here
-		return none; // that was not a std_address!
-	}
-	std::string int_address_string = cryptonote::get_account_integrated_address_as_str(
-		nettype,
-		info.address,
-		payment_id_short
-	);
-	return int_address_string;
-}

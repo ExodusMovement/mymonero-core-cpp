@@ -48,7 +48,6 @@ namespace monero_paymentID_utils
 	//
 	// Generating Payment IDs
 	crypto::hash8 new_short_plain_paymentID();
-	string new_short_plain_paymentID_string();
 	//
 	// Parsing and Detecting Payment IDs
 	bool parse_long_payment_id(const string& payment_id_str, crypto::hash& payment_id);

@@ -56,7 +56,5 @@ namespace monero
 		DecodedAddress_RetVals decodedAddress(const string &addressString, network_type nettype);
 		bool isSubAddress(const string &addressString, network_type nettype);
 		bool isIntegratedAddress(const string &addressString, network_type nettype);
-		//
-		optional<string> new_integratedAddrFromStdAddr(const string &std_address_string, const string &short_paymentID, cryptonote::network_type nettype);
 	}
 }

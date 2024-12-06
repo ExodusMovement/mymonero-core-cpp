@@ -78,7 +78,6 @@ namespace monero_wallet_utils
 	const static unsigned long sec_seed_hex_string_length = sizeof(secret_key) * 2;
 	const static unsigned long legacy16B__sec_seed_hex_string_length = sizeof(legacy16B_secret_key) * 2;
 	//
-	bool are_equal_mnemonics(const string &words_a, const string &words_b);
  	//
 	//
 	// Accounts
@@ -99,10 +98,6 @@ namespace monero_wallet_utils
 	{
 		optional<epee::wipeable_string> mnemonic_string = none;
 	};
-	SeedDecodedMnemonic_RetVals mnemonic_string_from_seed_hex_string(
-		const string &seed_string,
-		const string &wordsetName
-	);
 	//
 	// Convenience functions - Wallets
 	struct WalletDescription
@@ -159,18 +154,8 @@ namespace monero_wallet_utils
 			return none; // error .. possibly throw?
 		}
 	};
-	bool convenience__new_wallet_with_language_code(
-		const string &locale_language_code,
-		WalletDescriptionRetVals &retVals,
-		network_type nettype
-	);
 	bool new_wallet(
 		const string &mnemonic_language,
-		WalletDescriptionRetVals &retVals,
-		network_type nettype
-	);
-	bool wallet_with(
-		const string &mnemonic_string,
 		WalletDescriptionRetVals &retVals,
 		network_type nettype
 	);
@@ -182,14 +167,6 @@ namespace monero_wallet_utils
 		string pub_viewKey_string;
 		bool isInViewOnlyMode; // !sec_seed && !sec_spendKey
 	};
-	bool validate_wallet_components_with( // returns !did_error
-		const string &address_string,
-		const string &sec_viewKey_string,
-		optional<string> sec_spendKey_string,
-		optional<string> sec_seed_string,
-		network_type nettype,
-		WalletComponentsValidationResults &retVals
-	);
 	//
 	struct ComponentsFromSeed
 	{
@@ -204,11 +181,6 @@ namespace monero_wallet_utils
 	{
 		optional<ComponentsFromSeed> optl__val = boost::none;
 	};
-	bool address_and_keys_from_seed(
-		const string &sec_seed_string,
-		network_type nettype,
-		ComponentsFromSeed_RetVals &retVals
-	);
 }
 
 
