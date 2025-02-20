@@ -38,6 +38,7 @@
 #include <boost/property_tree/json_parser.hpp>
 //
 #include "cryptonote_config.h"
+#include "cryptonote_basic/blobdatatype.h"
 //
 
 namespace serial_bridge_utils
