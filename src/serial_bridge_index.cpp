@@ -46,7 +46,6 @@
 #include "wallet_errors.h"
 #include "string_tools.h"
 #include "ringct/rctSigs.h"
-#include "common/threadpool.h"
 #include "storages/portable_storage_template_helper.h"
 //
 #include "extend_helpers.hpp"
@@ -925,7 +924,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	}
 
 	BOOST_FOREACH (Output &output, tx.outputs) {
-		boost::optional<subaddress_receive_info> subaddr_recv_info = is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev, output.view_tag);
+		boost::optional<subaddress_receive_info> subaddr_recv_info = cryptonote::is_out_to_acc_precomp(subaddresses, output.pub, derivation, additional_derivations, output.index, hwdev, output.view_tag);
 		if (!subaddr_recv_info) continue;
 
 		Utxo utxo;
@@ -996,37 +995,23 @@ ExtractUtxosResponse serial_bridge::extract_utxos_raw(const string &args_string)
 		response.results_by_wallet_account.insert(std::make_pair(pair.first, ExtractUtxosResult{}));
 	}
 
-	tools::threadpool& tpool = tools::threadpool::getInstance();
-  	tools::threadpool::waiter waiter(tpool);
-	struct geniod_params
-	{
-		const BridgeTransaction &tx;
-	};
-
-	auto geniod = [&](const BridgeTransaction &tx) {
-		for (auto& pair : wallet_accounts_params) {
-			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, pair.second.account_keys, pair.second.subaddresses);
-
-			auto &result = response.results_by_wallet_account[pair.first];
-			result.utxos.insert(std::end(result.utxos), std::begin(tx_utxos), std::end(tx_utxos));
-		}
-	};
-
 	for (const auto& tx_desc : json_root.get_child("txs")) {
 		assert(tx_desc.first.empty());
 
 		BridgeTransaction tx;
 		try {
 			tx = serial_bridge::json_to_tx(tx_desc.second);
-
-			// submitting geniod function calls to the thread pool
-			tpool.submit(&waiter, [&, tx](){ geniod(tx); }, true);
 		} catch(std::invalid_argument err) {
 			continue;
 		}
-	}
 
-	THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
+		for (auto& pair : wallet_accounts_params) {
+			auto tx_utxos = serial_bridge::extract_utxos_from_tx(tx, pair.second.account_keys, pair.second.subaddresses);
+
+			auto &result = response.results_by_wallet_account[pair.first];
+			result.utxos.insert(std::end(result.utxos), std::begin(tx_utxos), std::end(tx_utxos));
+		}
+	}
 
 	for (const auto& pair : wallet_accounts_params) {
 		auto &result = response.results_by_wallet_account[pair.first];
