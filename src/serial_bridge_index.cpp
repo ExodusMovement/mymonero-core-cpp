@@ -913,7 +913,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	}
 
 	std::vector<crypto::key_derivation> additional_derivations;
-	for (const auto &pub : tx.additional_pubs) {
+	for (const auto& pub : tx.additional_pubs) {
 		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
 
 		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, additional_derivation))
@@ -1044,10 +1044,10 @@ void serial_bridge::expand_subaddresses(cryptonote::account_keys account_keys, s
 	const uint32_t begin = subaddresses.size();
 	const uint32_t end = get_subaddress_clamped_sum(tx_index.minor, lookahead);
 
-	cryptonote::subaddress_index index = {0, begin};
+	cryptonote::subaddress_index index = {tx_index.major, begin};
 
 	const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(account_keys, index.major, index.minor, end);
-	for (; index.minor < end; index.minor++) {
+	for (; index.minor < end; ++index.minor) {
 		const crypto::public_key &D = pkeys[index.minor - begin];
 		subaddresses[D] = index;
 	}
