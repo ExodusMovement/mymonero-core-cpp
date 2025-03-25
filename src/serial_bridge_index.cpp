@@ -50,6 +50,7 @@
 #include "storages/portable_storage_template_helper.h"
 //
 #include "extend_helpers.hpp"
+#include "device_trezor.hpp"
 #include "serial_bridge_utils.hpp"
 
 #ifdef __linux__
@@ -62,6 +63,7 @@ using namespace std;
 using namespace boost;
 using namespace cryptonote;
 using namespace extend_helpers;
+using namespace device_trezor;
 using namespace monero_transfer_utils;
 using namespace monero_fork_rules;
 //
@@ -837,6 +839,7 @@ boost::property_tree::ptree serial_bridge::utxos_to_json(std::vector<Utxo> utxos
 		out_ptree.put("key_image", utxo.key_image);
 		out_ptree.put("index_major", utxo.index.major);
 		out_ptree.put("index_minor", utxo.index.minor);
+		out_ptree.put("derivation", epee::string_tools::pod_to_hex(utxo.derivation));
 		out_ptree.put("mask", epee::string_tools::pod_to_hex(utxo.mask));
 
 		if (native) {
@@ -913,7 +916,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 	}
 
 	std::vector<crypto::key_derivation> additional_derivations;
-	for (const auto &pub : tx.additional_pubs) {
+	for (const auto& pub : tx.additional_pubs) {
 		crypto::key_derivation additional_derivation = AUTO_VAL_INIT(additional_derivation);
 
 		if (!crypto::generate_key_derivation(pub, account_keys.m_view_secret_key, additional_derivation))
@@ -932,6 +935,7 @@ std::vector<Utxo> serial_bridge::extract_utxos_from_tx(BridgeTransaction tx, cry
 		utxo.tx_id = tx.id;
 		utxo.index = subaddr_recv_info->index;
 		utxo.vout = output.index;
+		utxo.derivation = subaddr_recv_info->derivation;
 		utxo.amount = serial_bridge::decode_amount(tx.version, subaddr_recv_info->derivation, tx.rv, output.amount, output.index, utxo.mask);
 		utxo.tx_pub = tx.pub;
 		utxo.pub = output.pub;
@@ -1860,5 +1864,44 @@ string serial_bridge::extract_utxos(const string &args_string) {
 	}
 	root.add_child("results", results_tree);
 
+	return ret_json_from_root(root);
+}
+
+string serial_bridge::verify_trezor_key_image(const string &args_string) {
+	boost::property_tree::ptree json_root;
+	if (!parsed_json_root(args_string, json_root)) {
+		// it will already have thrown an exception
+		return error_ret_json_from_message("Invalid JSON");
+	}
+
+	crypto::key_image key_image;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("key_image"), key_image)) {
+		return error_ret_json_from_message("Invalid 'key_image'");
+	}
+
+	crypto::public_key out_key;
+	if (!epee::string_tools::hex_to_pod(json_root.get<string>("output_key"), out_key)) {
+		return error_ret_json_from_message("Invalid 'output_key'");
+	}
+	std::string signature_hex = json_root.get<string>("signature");
+    if (signature_hex.empty()) {
+        return error_ret_json_from_message("Invalid 'signature'");
+    }
+
+    std::string signature;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(signature_hex, signature)) {
+        return error_ret_json_from_message("Failed to parse 'signature' from hex");
+    }
+
+	RetVals_base retVals;
+	device_trezor::check_computed_key_image(out_key, key_image, signature, retVals);
+	
+	if (retVals.did_error) {
+		return error_ret_json_from_message(*(retVals.err_string));
+	}
+
+	boost::property_tree::ptree root;
+	root.put(ret_json_key__generic_retVal(), !retVals.did_error);
+	//
 	return ret_json_from_root(root);
 }

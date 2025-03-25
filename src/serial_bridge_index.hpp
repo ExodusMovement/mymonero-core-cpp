@@ -70,6 +70,7 @@ namespace serial_bridge
 		string amount;
 		string key_image;
 		rct::key mask;
+		crypto::key_derivation derivation;
 	};
 
 	struct Utxo: public UtxoBase {
@@ -205,6 +206,7 @@ namespace serial_bridge
 	string encrypt_payment_id(const string &args_string);
 	//
 	string extract_utxos(const string &args_string);
+	string verify_trezor_key_image(const string &args_string);
 }
 
 #endif /* serial_bridge_index_hpp */
